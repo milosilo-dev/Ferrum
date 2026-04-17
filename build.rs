@@ -1,9 +1,25 @@
+use std::ffi::OsStr;
 use std::fs;
 use std::process::Command;
 
 const ASM: &str = "nasm";
 
+fn remove_files_with_extension(dir_path: &str, extension: &str) -> Result<(), Box<dyn std::error::Error>> {
+    for entry in fs::read_dir(dir_path)? {
+        let path = entry?.path();
+        // Check if the file has the specific extension
+        if path.extension() == Some(OsStr::new(extension)) {
+            if path.is_file() {
+                fs::remove_file(&path)?;
+            }
+        }
+    }
+    Ok(())
+}
+
 fn main() {
+    let _ = remove_files_with_extension("guest", "bin");
+
     let entries = fs::read_dir("guest").expect("failed to read guest directory");
 
     for entry in entries {

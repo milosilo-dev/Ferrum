@@ -1,4 +1,7 @@
-use crate::{device_maps::{io::IODeviceRegion, mmio::MMIODeviceRegion}, irq_map::IrqMap};
+use crate::{
+    device_maps::{io::IODeviceRegion, mmio::MMIODeviceRegion},
+    irq_map::IrqMap,
+};
 
 pub struct MemoryRegion {
     pub mem_size: usize,
@@ -12,10 +15,7 @@ pub struct Binary {
 
 impl Binary {
     pub fn new(data: Vec<u8>, offset: u64) -> Self {
-        Self{
-            data,
-            offset
-        }
+        Self { data, offset }
     }
 
     fn build_boot_params(bzimage: &[u8]) -> Vec<u8> {
@@ -52,22 +52,24 @@ impl Binary {
         let kernel_offset = setup_size;
 
         let boot_params = Self::build_boot_params(&data);
-        vec![Self {
-            data: data[0..setup_size].to_vec(),
-            offset: 0x10000,
-        },
-        Self {
-            data: data[kernel_offset..].to_vec(),
-            offset: 0x100000,
-        },
-        Self {
-            data: boot_params,
-            offset: 0x20000,
-        },
-        Self {
-            data: b"console=ttyS0 earlyprintk=serial\0".to_vec(),
-            offset: 0x21000,
-        }]
+        vec![
+            Self {
+                data: data[0..setup_size].to_vec(),
+                offset: 0x10000,
+            },
+            Self {
+                data: data[kernel_offset..].to_vec(),
+                offset: 0x100000,
+            },
+            Self {
+                data: boot_params,
+                offset: 0x20000,
+            },
+            Self {
+                data: b"console=ttyS0 earlyprintk=serial\0".to_vec(),
+                offset: 0x21000,
+            },
+        ]
     }
 }
 

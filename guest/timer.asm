@@ -37,6 +37,12 @@ out 0x21, al
 mov al, 0xFE
 out 0xA1, al
 
+; divisor 1193 ≈ 1000 Hz (1ms ticks) — or use 0 for default 18.2Hz
+mov al, 0x00        ; low byte of 1193 = 0x04A9
+out 0x40, al
+mov al, 0x00        ; high byte
+out 0x40, al
+
 sti
 
 main:

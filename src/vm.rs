@@ -17,7 +17,8 @@ use crate::{
 use libc::{MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE, mmap};
 use std::{
     ptr,
-    sync::{Arc, Mutex}, thread,
+    sync::{Arc, Mutex},
+    thread,
 };
 
 pub enum CrashReason {
@@ -44,10 +45,11 @@ impl VirtualMachine {
         let vm = Arc::new(Mutex::new(kvm.create_vm().unwrap()));
         let _ = vm.lock().unwrap().create_irq_chip().unwrap();
 
-        let mut routing: FamStructWrapper<kvm_irq_routing> = FamStructWrapper::new(machine_config.irq_map.len()).unwrap();
+        let mut routing: FamStructWrapper<kvm_irq_routing> =
+            FamStructWrapper::new(machine_config.irq_map.len()).unwrap();
 
         let mut idx = 0;
-        for irq_map in machine_config.irq_map{
+        for irq_map in machine_config.irq_map {
             routing.as_mut_slice()[idx] = kvm_irq_routing_entry {
                 gsi: irq_map.read_gsi(),
                 type_: KVM_IRQ_ROUTING_IRQCHIP,
@@ -59,7 +61,7 @@ impl VirtualMachine {
                 },
                 ..Default::default()
             };
-            idx+=1;
+            idx += 1;
         }
 
         vm.lock().unwrap().set_gsi_routing(&routing).unwrap();
