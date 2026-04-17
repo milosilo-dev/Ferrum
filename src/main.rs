@@ -1,10 +1,7 @@
 use std::fs;
 
 use skhv::{
-    device_maps::{io::IODeviceRegion, mmio::MMIODeviceRegion},
-    devices::{serial::Serial, timer::Timer},
-    machine_config::{Binary, MachineConfig, MemoryRegion},
-    vm::VirtualMachine,
+    device_maps::{io::IODeviceRegion, mmio::MMIODeviceRegion}, devices::{serial::Serial, timer::Timer}, irq_map::IrqMap, machine_config::{Binary, MachineConfig, MemoryRegion}, vm::VirtualMachine
 };
 
 fn main() {
@@ -32,6 +29,7 @@ fn main() {
             IODeviceRegion::new(0xE9..=0xE9, dbgcom2),
         ],
         mmio_devices: vec![MMIODeviceRegion::new(0xF0001000..=0xF0001008, timer)],
+        irq_map: IrqMap::default_map(),
         code_entry: 0x1000,
     });
 

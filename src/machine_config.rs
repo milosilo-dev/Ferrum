@@ -1,4 +1,4 @@
-use crate::device_maps::{io::IODeviceRegion, mmio::MMIODeviceRegion};
+use crate::{device_maps::{io::IODeviceRegion, mmio::MMIODeviceRegion}, irq_map::IrqMap};
 
 pub struct MemoryRegion {
     pub mem_size: usize,
@@ -76,6 +76,7 @@ pub struct MachineConfig {
     pub binaries: Vec<Binary>,
     pub io_devices: Vec<IODeviceRegion>,
     pub mmio_devices: Vec<MMIODeviceRegion>,
+    pub irq_map: Vec<IrqMap>,
 
     pub code_entry: usize,
 }

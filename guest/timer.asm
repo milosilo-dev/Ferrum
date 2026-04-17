@@ -34,7 +34,7 @@ out 0xA1, al
 ; unmask IRQ0
 mov al, 0xFE
 out 0x21, al
-mov al, 0xFD
+mov al, 0xFE
 out 0xA1, al
 
 sti

@@ -46,13 +46,28 @@ impl VirtualMachine {
         let vm = Arc::new(Mutex::new(kvm.create_vm().unwrap()));
         let _ = vm.lock().unwrap().create_irq_chip().unwrap();
 
-        let mut routing: FamStructWrapper<kvm_irq_routing> = FamStructWrapper::new(1).unwrap();
+        let mut routing: FamStructWrapper<kvm_irq_routing> = FamStructWrapper::new(2).unwrap();
 
         routing.as_mut_slice()[0] = kvm_irq_routing_entry {
+            gsi: 0,
+            type_: KVM_IRQ_ROUTING_IRQCHIP,
+            u: kvm_bindings::kvm_irq_routing_entry__bindgen_ty_1 {
+                irqchip: kvm_bindings::kvm_irq_routing_irqchip {
+                    irqchip: 0,
+                    pin: 0,
+                },
+            },
+            ..Default::default()
+        };
+
+        routing.as_mut_slice()[1] = kvm_irq_routing_entry {
             gsi: 1,
             type_: KVM_IRQ_ROUTING_IRQCHIP,
             u: kvm_bindings::kvm_irq_routing_entry__bindgen_ty_1 {
-                irqchip: kvm_bindings::kvm_irq_routing_irqchip { irqchip: 0, pin: 1 },
+                irqchip: kvm_bindings::kvm_irq_routing_irqchip {
+                    irqchip: 0,
+                    pin: 1,
+                },
             },
             ..Default::default()
         };
@@ -137,6 +152,7 @@ impl VirtualMachine {
                 };
                 while let Some(irq) = irqs.pop_front() {
                     let vm_lock = vm_tick.lock().unwrap();
+                    println!("Line: {}, Active: {}", irq.irq_line, irq.value);
                     match vm_lock.set_irq_line(irq.irq_line, irq.value) {
                         Ok(_) => {}
                         Err(e) => println!("IRQ failed: {:?}", e),
