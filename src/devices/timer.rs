@@ -16,6 +16,10 @@ pub struct Timer {
     last_tick: Instant,
 }
 
+// ========
+// 8254 PIT device
+// ========
+
 impl Timer {
     pub fn new() -> Self {
         Self {

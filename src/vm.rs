@@ -17,9 +17,7 @@ use crate::{
 use libc::{MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE, mmap};
 use std::{
     ptr,
-    sync::{Arc, Mutex},
-    thread::{self, sleep},
-    time::Duration,
+    sync::{Arc, Mutex}, thread,
 };
 
 pub enum CrashReason {
@@ -63,32 +61,6 @@ impl VirtualMachine {
             };
             idx+=1;
         }
-
-        /*
-        routing.as_mut_slice()[0] = kvm_irq_routing_entry {
-            gsi: 0,
-            type_: KVM_IRQ_ROUTING_IRQCHIP,
-            u: kvm_bindings::kvm_irq_routing_entry__bindgen_ty_1 {
-                irqchip: kvm_bindings::kvm_irq_routing_irqchip {
-                    irqchip: 0,
-                    pin: 0,
-                },
-            },
-            ..Default::default()
-        };
-
-        routing.as_mut_slice()[1] = kvm_irq_routing_entry {
-            gsi: 1,
-            type_: KVM_IRQ_ROUTING_IRQCHIP,
-            u: kvm_bindings::kvm_irq_routing_entry__bindgen_ty_1 {
-                irqchip: kvm_bindings::kvm_irq_routing_irqchip {
-                    irqchip: 0,
-                    pin: 1,
-                },
-            },
-            ..Default::default()
-        };
-        */
 
         vm.lock().unwrap().set_gsi_routing(&routing).unwrap();
 
@@ -169,8 +141,6 @@ impl VirtualMachine {
                         Err(e) => println!("IRQ failed: {:?}", e),
                     }
                 }
-
-                sleep(Duration::from_millis(1));
             }
         });
 
