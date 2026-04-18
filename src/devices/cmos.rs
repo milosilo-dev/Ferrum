@@ -1,9 +1,4 @@
-use std::{
-    alloc::System,
-    time::{SystemTime, UNIX_EPOCH},
-};
-
-use chrono::{Timelike, Utc};
+use chrono::{Datelike, Timelike, Utc};
 
 use crate::device_maps::io::IODevice;
 
@@ -54,6 +49,22 @@ impl IODevice for Cmos {
                 CmosRegister::Hour => {
                     let now = Utc::now();
                     vec![now.hour() as u8; length]
+                }
+                CmosRegister::DayOfWeek => {
+                    let now = Utc::now();
+                    vec![now.weekday().number_from_monday() as u8; length]
+                }
+                CmosRegister::DayOfMonth => {
+                    let now = Utc::now();
+                    vec![now.day() as u8; length]
+                }
+                CmosRegister::Month => {
+                    let now = Utc::now();
+                    vec![now.month() as u8; length]
+                }
+                CmosRegister::Year => {
+                    let now = Utc::now();
+                    vec![(now.year() % 100) as u8; length]
                 }
                 _ => vec![0; length],
             },
