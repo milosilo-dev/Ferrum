@@ -1,11 +1,11 @@
 use crate::device_maps::mmio::MMIODevice;
 
-pub struct VirtioBlock {
+pub struct MMIOTransport {
     queue_ready: u8,
     interrupt_status: u64,
 }
 
-impl MMIODevice for VirtioBlock {
+impl MMIODevice for MMIOTransport {
     fn read(&mut self, addr: u64, length: usize) -> Vec<u8> {
         let value = (match addr {
             0x000 => 0x74726976,                // Magic number
