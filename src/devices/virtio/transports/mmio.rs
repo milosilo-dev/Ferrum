@@ -1,8 +1,17 @@
-use crate::{device_maps::mmio::MMIODevice, devices::virtio::virtio::{VirtioDevice, VirtioQueue}, memory_region::GuestMemoryHandle};
+use std::sync::{Arc, Mutex};
+
+use crate::{device_maps::mmio::MMIODevice, devices::virtio::virtio::{VirtioDevice, VirtioQueue}, irq_handler::{IRQCommand, IRQHandler}, memory_region::GuestMemoryHandle};
 
 const MAGIC_NUMBER: u32 = 0x74726976;
 const VERSION: u32 = 0x2;
 const VENDOR_ID: u32 = 0x56484B53;
+const IRQ_LINE: u32 = 5;
+
+fn read_u32_from_data(data: &[u8]) -> u32 {
+    let mut buf = [0u8; 4];
+    buf[..data.len()].copy_from_slice(data);
+    u32::from_le_bytes(buf)
+}
 
 pub struct MMIOTransport {
     device: Box<dyn VirtioDevice + Sync + Send>,
@@ -11,16 +20,19 @@ pub struct MMIOTransport {
     queue_sel: usize,
     status: u32,
     interrupt_status: u32,
+
+    irq_line: Option<Arc<Mutex<IRQHandler>>>,
 }
 
 impl MMIOTransport {
-    pub fn new(device: Box<dyn VirtioDevice + Sync + Send>) -> Self{
+    pub fn new(device: Box<dyn VirtioDevice + Sync + Send>, queue_num: usize) -> Self{
         Self {
             device,
-            queues: vec![],
+            queues: vec![VirtioQueue::new(); queue_num],
             queue_sel: 0,
             status: 0,
             interrupt_status: 0,
+            irq_line: None,
         }
     }
 }
@@ -45,21 +57,67 @@ impl MMIODevice for MMIOTransport {
 
     fn write(&mut self, addr: u64, data: &[u8]) {
         match addr{
+            0x028 => {},
             0x030 => self.queue_sel = data[data.len() - 1] as usize,
-            0x038 => self.queues = vec![VirtioQueue::new(); data[data.len() - 1] as usize],
+            0x038 => self.queues[self.queue_sel].size = u16::from_le_bytes([data[0], data[1]]),
             0x044 => self.queues[self.queue_sel].ready = data[data.len() - 1] != 0,
-            0x050 => self.queues[self.queue_sel].queue_notify(),
-            0x080 => self.queues[self.queue_sel].desc_addr = (self.queues[self.queue_sel].desc_addr & 0xFF00) | (data[data.len() - 1] as u16),
-            0x084 => self.queues[self.queue_sel].desc_addr = (self.queues[self.queue_sel].desc_addr & 0x00FF) | (data[data.len() - 1] as u16),
-            0x090 => self.queues[self.queue_sel].avail_addr = (self.queues[self.queue_sel].avail_addr & 0xFF00) | (data[data.len() - 1] as u16),
-            0x094 => self.queues[self.queue_sel].avail_addr = (self.queues[self.queue_sel].avail_addr & 0x00FF) | (data[data.len() - 1] as u16),
-            0x0A0 => self.queues[self.queue_sel].used_addr = (self.queues[self.queue_sel].used_addr & 0xFF00) | (data[data.len() - 1] as u16),
-            0x0A4 => self.queues[self.queue_sel].used_addr = (self.queues[self.queue_sel].used_addr & 0x00FF) | (data[data.len() - 1] as u16),
+            0x060 => {},
+            0x070 => {},
+            0x080 => {
+                let val = read_u32_from_data(data) as u64;
+                self.queues[self.queue_sel].desc_addr =
+                    (self.queues[self.queue_sel].desc_addr & 0xFFFFFFFF00000000) | val;
+            },
+            0x084 => {
+                let val = read_u32_from_data(data) as u64;
+                self.queues[self.queue_sel].desc_addr =
+                    (self.queues[self.queue_sel].desc_addr & 0x00000000FFFFFFFF) | val;
+            },
+            0x090 => {
+                let val = read_u32_from_data(data) as u64;
+                self.queues[self.queue_sel].avail_addr =
+                    (self.queues[self.queue_sel].avail_addr & 0xFFFFFFFF00000000) | val;
+            },
+            0x094 => {
+                let val = read_u32_from_data(data) as u64;
+                self.queues[self.queue_sel].avail_addr =
+                    (self.queues[self.queue_sel].avail_addr & 0x00000000FFFFFFFF) | val;
+            },
+            0x0A0 => {
+                let val = read_u32_from_data(data) as u64;
+                self.queues[self.queue_sel].used_addr =
+                    (self.queues[self.queue_sel].used_addr & 0xFFFFFFFF00000000) | val;
+            }
+            0x0A4 => {
+                let val = read_u32_from_data(data) as u64;
+                self.queues[self.queue_sel].used_addr =
+                    (self.queues[self.queue_sel].used_addr & 0x00000000FFFFFFFF) | val;
+            },
             _ => {}
         }
     }
 
     fn pass_guest_memory(&mut self, guest_memory: GuestMemoryHandle) {
         self.device.pass_guest_memory(guest_memory);
+    }
+
+    fn tick(&mut self) {
+        for queue in &mut self.queues{
+            if queue.ready{
+                let completions = self.device.as_mut().tick(queue);
+                if completions && self.irq_line.is_some(){
+                    self.irq_line
+                        .as_mut()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .trigger_irq(IRQCommand::new(IRQ_LINE, true));
+                }
+            }
+        }
+    }
+
+    fn irq_handler(&mut self, irq_handler: Arc<Mutex<IRQHandler>>) {
+        self.irq_line = Some(irq_handler);
     }
 }

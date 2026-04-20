@@ -18,7 +18,7 @@ impl MemoryRegion {
     }
 
     // Addr is an offset from the start of the memory region
-    pub fn write(&self, data: &mut [u8], addr: usize) {
+    pub fn write(&self, data: &[u8], addr: usize) {
         if self.ptr.is_null() || addr + data.len() > self.mem_size {
             return;
         }
@@ -33,7 +33,7 @@ impl MemoryRegion {
         }
     }
 
-    pub fn read(&mut self, addr: usize, length: usize) -> Option<Vec<u8>> {
+    pub fn read(&self, addr: usize, length: usize) -> Option<Vec<u8>> {
         if self.ptr.is_null() || addr + length > self.mem_size {
             return None;
         }
