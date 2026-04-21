@@ -3,7 +3,7 @@ use crate::memory_region::{GuestMemoryHandle};
 pub trait VirtioDevice {
     fn virtio_type(&self) -> u32;
     fn features(&self) -> u32;
-    fn pass_guest_memory(&mut self, _guest_memory: GuestMemoryHandle);
+    fn pass_guest_memory(&mut self, _guest_memory: VirtioGuestMemoryHandle);
     fn tick(&mut self, queue: &mut VirtioQueue) -> bool;
 }
 
@@ -12,6 +12,12 @@ pub struct VirtioGuestMemoryHandle{
 }
 
 impl VirtioGuestMemoryHandle {
+    pub fn new(mem: GuestMemoryHandle) -> Self {
+        Self{
+            mem
+        }
+    }
+
     pub fn read_u16(&self, addr: u64) -> u16{
         const LENGTH: u64 = 2;
 
@@ -109,6 +115,13 @@ impl VirtioGuestMemoryHandle {
     }
 }
 
+pub struct VirtqDesc {
+    pub addr: u64,
+    pub len: u32,
+    pub flags: u16,
+    pub next: u16,
+}
+
 #[derive(Clone)]
 pub struct VirtioQueue {
     pub size: u16,
@@ -155,5 +168,23 @@ impl VirtioQueue {
         mem.write_u32(self.used_addr + offset + 4, len);
 
         mem.write_u16(self.used_addr + 2, used_idx + 1);
+    }
+
+    pub fn get_descriptor(&self, mem: &VirtioGuestMemoryHandle, index: u16) -> VirtqDesc {
+        let desc_addr = self.desc_addr + (index as u64) * 16;
+
+        VirtqDesc {
+            addr:  mem.read_u64(desc_addr + 0),
+            len:   mem.read_u32(desc_addr + 8),
+            flags: mem.read_u16(desc_addr + 12),
+            next:  mem.read_u16(desc_addr + 14),
+        }
+    }
+
+    pub fn read_avail_entry(&self, mem: &VirtioGuestMemoryHandle, idx: u16) -> u16 {
+        let ring_offset =
+            4 + ((idx % self.size) as u64) * 2;
+
+        mem.read_u16(self.avail_addr + ring_offset)
     }
 }

@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{device_maps::mmio::MMIODevice, devices::virtio::virtio::{VirtioDevice, VirtioQueue}, irq_handler::{IRQCommand, IRQHandler}, memory_region::GuestMemoryHandle};
+use crate::{device_maps::mmio::MMIODevice, devices::virtio::virtio::{VirtioDevice, VirtioGuestMemoryHandle, VirtioQueue}, irq_handler::{IRQCommand, IRQHandler}, memory_region::GuestMemoryHandle};
 
 const MAGIC_NUMBER: u32 = 0x74726976;
 const VERSION: u32 = 0x2;
@@ -98,7 +98,7 @@ impl MMIODevice for MMIOTransport {
     }
 
     fn pass_guest_memory(&mut self, guest_memory: GuestMemoryHandle) {
-        self.device.pass_guest_memory(guest_memory);
+        self.device.pass_guest_memory(VirtioGuestMemoryHandle::new(guest_memory));
     }
 
     fn tick(&mut self) {
