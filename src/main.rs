@@ -17,17 +17,13 @@ fn main() {
 
     let rng = Box::new(MMIOTransport::new(Box::new(RngVirtio::new()), 1));
 
-    let init_mem_image = fs::read("guest/linuxBzImage").unwrap();
+    let init_mem_image = fs::read("guest/clock.bin").unwrap();
     let mut vm = VirtualMachine::new(MachineConfig {
         memory_regions: vec![MemoryRegionConfig {
-                mem_size: 0xA0000,              // 640 KB conventional
-                mem_offset: 0x0000,
-            },
-            MemoryRegionConfig {
-                mem_size: 128 * 1024 * 1024,    // 128 MB extended (≥ pref_address + init_size)
-                mem_offset: 0x100000,
-        },],
-        binaries: Binary::load_bz_image(init_mem_image),
+            mem_size: 64 * 1024 * 1024,
+            mem_offset: 0x0000,
+        }],
+        binaries: vec![Binary::new(init_mem_image, 0x1000)],
         io_devices: vec![
             IODeviceRegion::new(0x40..=0x43, timer),
             IODeviceRegion::new(0x3f8..=0x3ff, com1),
@@ -38,7 +34,7 @@ fn main() {
             MMIODeviceRegion::new(0x10001000..=0x10001FFF, rng),
         ],
         irq_map: IrqMap::default_map(),
-        code_entry: 0x0200,
+        code_entry: 0x1000,
     });
 
     loop {
