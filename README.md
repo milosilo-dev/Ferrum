@@ -25,9 +25,9 @@ The project is split into two halves:
 │  ├── VCPU (KVM vCPU fd)                     │
 │  ├── MemoryRegion (mmap'd guest RAM)        │
 │  ├── IODeviceMap                            │
-│  │   ├── Serial (0x3F8, 0x2F8)             │
-│  │   ├── PIT    (0x40–0x43)                │
-│  │   └── CMOS   (0x70–0x71)               │
+│  │   ├── Serial (0x3F8, 0x2F8)              │
+│  │   ├── PIT    (0x40–0x43)                 │
+│  │   └── CMOS   (0x70–0x71)                 │
 │  └── MMIODeviceMap                          │
 │      └── MMIOTransport (virtio)             │
 │          ├── RngVirtio  (0x10001000)        │
@@ -149,26 +149,3 @@ The `build.rs` script automatically assembles `entry.asm`, compiles the C firmwa
 - [ ] ELF loader
 - [ ] Jump to Limine bootloader
 - [ ] Boot Linux
-
----
-
-## Name Suggestions
-
-The current placeholder name `skhv` doesn't say much. Here are some alternatives:
-
-| Name | Rationale |
-|---|---|
-| **Ferrum** | Latin for iron — raw, foundational, close to the metal |
-| **Bedrock** | The layer everything else sits on |
-| **Stratum** | Layers of abstraction from firmware up to Linux |
-| **Cinderblock** | Blunt, structural, unpretentious systems software |
-| **Ashveil** | Abstract, obscures the hardware from the guest |
-| **Hearthstone** | The base everything is built around |
-
-**Ferrum** is my pick — short, memorable, hints at low-level systems work without being too on-the-nose about virtualization.
-
----
-
-## License
-
-MIT
