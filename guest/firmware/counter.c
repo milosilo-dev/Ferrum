@@ -45,14 +45,28 @@ void virtio_cnt_init(void){
     serial_puts("virtio-cnt: init done\n");
 }
 
-bool virtio_cnt(uint8_t *buf) {
-    uint16_t d = cnt_next_desc % QUEUE_SIZE;
-    cnt_next_desc = (cnt_next_desc + 1) % QUEUE_SIZE;
+typedef struct {
+    uint32_t input;
+    uint32_t output;
+} VirtioCountData;
 
-    cnt_queue.desc[d].addr  = (uint64_t)buf;
+uint32_t virtio_cnt(uint32_t in) {
+    VirtioCountData data;
+    data.input = in;
+
+    uint16_t d = cnt_next_desc % QUEUE_SIZE;
+    uint16_t d2 = (cnt_next_desc + 1) % QUEUE_SIZE;
+    cnt_next_desc = (cnt_next_desc + 2) % QUEUE_SIZE;
+
+    cnt_queue.desc[d].addr  = (uint64_t)&data.input;
     cnt_queue.desc[d].len   = 4;
-    cnt_queue.desc[d].flags = VIRTQ_DESC_F_WRITE;
-    cnt_queue.desc[d].next  = 0;
+    cnt_queue.desc[d].flags = VIRTQ_DESC_F_WRITE | VIRTQ_DESC_F_NEXT;
+    cnt_queue.desc[d].next  = d2;
+
+    cnt_queue.desc[d2].addr = (uint64_t)&data.output;
+    cnt_queue.desc[d2].len   = 4;
+    cnt_queue.desc[d2].flags = VIRTQ_DESC_F_WRITE;
+    cnt_queue.desc[d2].next  = 0;
 
     cnt_queue.avail.ring[cnt_avail_idx % QUEUE_SIZE] = d;
     cnt_avail_idx++;
@@ -73,5 +87,5 @@ bool virtio_cnt(uint8_t *buf) {
     uint32_t written = cnt_queue.used.ring[cnt_last_used % QUEUE_SIZE].len;
     cnt_last_used++;
 
-    return written == 4;
+    return data.output;
 }

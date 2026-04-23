@@ -18,15 +18,9 @@ void c_main(void) {
     }
     serial_puts("\n");
 
-    uint8_t cnt_buf[4] = {10, 0, 0, 0};
-    bool sucess = virtio_cnt(cnt_buf);
-
+    uint32_t increament = virtio_cnt(0x20);
     serial_puts("counter: ");
-    for (int i = 0; i < 4; i++) {
-        serial_putx(cnt_buf[i]);
-        serial_putc(' ');
-    }
-    serial_puts("\n");
+    serial_putx(increament);
 
     // spin forever
     while (1) {

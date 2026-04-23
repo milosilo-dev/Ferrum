@@ -36,14 +36,15 @@ impl VirtioDevice for CntVirtio {
         while let Some(head) = queue.pop_avail(&guest_memory) {
             let desc = queue.get_descriptor(&guest_memory, head);
 
-            if desc.flags & 2 == 0 {
-                panic!("virtio-rng got non-writable buffer");
+            if desc.flags & 2 == 0 || desc.flags & 1 == 0 {
+                panic!("virtio-cnt got unusable buffer: {:b}", desc.flags);
             }
 
-            let cur_value = guest_memory.read_u32(desc.addr);
+            let desc2 = queue.get_descriptor(&guest_memory, desc.next);
 
-            let data = (cur_value + 1).to_be_bytes();
-            guest_memory.write_guest_memory(desc.addr, &data);
+            let input = guest_memory.read_u32(desc.addr);
+            let output = input + 1;
+            guest_memory.write_u32(desc2.addr, output);
 
             queue.push_used(&mut guest_memory, head, desc.len);
 
