@@ -1,6 +1,6 @@
 use std::fs;
 
-use skhv::{
+use ferrum::{
     device_maps::{io::IODeviceRegion, mmio::MMIODeviceRegion},
     devices::{cmos::Cmos, serial::Serial, timer::Pit, virtio::{devices::{counter::CntVirtio, rng::RngVirtio}, transports::mmio::MMIOTransport}},
     irq_map::IrqMap,
