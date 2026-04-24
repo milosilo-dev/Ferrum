@@ -1,11 +1,13 @@
-use std::process::Command;
+use std::{path::Path, process::Command};
 use walkdir::WalkDir;
 
 const ASM: &str = "nasm";
 const CC: &str = "i686-elf-gcc";
 const LD: &str = "i686-elf-ld";
 const OBJ: &str = "objcopy";
+
 const FIRMWARE_PATH: &str = "guest/firmware";
+const DISK_FILE: &str = "guest/disk.bin";
 
 fn build_firmware() {
     let asm_input = FIRMWARE_PATH.to_owned() + "/entry.asm";
@@ -56,8 +58,24 @@ fn build_firmware() {
     }
 }
 
+fn ensure_disk_file() {
+    let path = Path::new(DISK_FILE);
+
+    if !path.is_file() {
+        let status = Command::new("dd")
+            .args(["if=/dev/random", format!("of={}", DISK_FILE).as_str(), "bs=1M", "count=64"])
+            .status()
+            .expect("failed to run nasm");
+
+        if !status.success() {
+            panic!("DD could not make disk");
+        }
+    }
+}
+
 fn build() {
     build_firmware();
+    ensure_disk_file();
 
     for entry in WalkDir::new("guest/test").into_iter().filter_map(Result::ok) {
         let path = entry.path();
