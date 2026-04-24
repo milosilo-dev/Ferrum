@@ -94,7 +94,10 @@ impl VirtioDevice for BlkVirtio {
 
                     match self.blk_file.read_exact(&mut buf) {
                         Ok(_) => guest_memory.write_u8(status_byte.addr, 0x00),
-                        Err(_) => guest_memory.write_u8(status_byte.addr, 0x01),
+                        Err(err) => {
+                            println!("{}", err);
+                            guest_memory.write_u8(status_byte.addr, 0x01)
+                        },
                     }
 
                     guest_memory.write_guest_memory(data_section.addr, &buf);
