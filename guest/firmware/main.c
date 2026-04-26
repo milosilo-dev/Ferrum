@@ -25,19 +25,12 @@ void c_main(void) {
     serial_putx(increament);
     serial_puts("\n");
 
-    uint8_t blk_buf_write[10] = {0xFF};
-    uint8_t status = virtio_blk_write(0, 10, blk_buf_write);
-    serial_puts("disk write status: ");serial_putx(status);serial_puts("\n");
-
-    uint8_t blk_buf_read[20] = {0};
-    uint8_t status2 = virtio_blk_read(0, 20, blk_buf_read);
-    serial_puts("disk read status: ");serial_putx(status2);serial_puts("\n");
-    serial_puts("read from disk: ");
-    for (int i = 0; i < 20; i++) {
-        serial_putx(blk_buf_read[i]);
-        serial_putc(' ');
-    }
-    serial_puts("\n");
+    uint8_t sector[512];
+    uint32_t status = virtio_blk_read(0, 512, sector);
+    serial_puts("status: "); serial_putx(status); serial_puts("\n");
+    serial_puts("MBR sig: ");
+    serial_putx(sector[510]); serial_putc(' ');
+    serial_putx(sector[511]); serial_puts("\n");
 
     // spin forever
     while (1) {
