@@ -41,8 +41,8 @@ protected_entry:
     mov esp, 0x7C00
 
     ; Call into C - never returns
-    extern c_main
-    call c_main
+    extern c_main_32
+    call c_main_32
     hlt
 
 ; ── Minimal flat GDT (null / code / data) ──────────────────────────────────
@@ -56,3 +56,43 @@ gdt_end:
 gdt_ptr:
     dw gdt_end - gdt_start - 1
     dd gdt_start
+
+global enter_long_mode
+enter_long_mode:
+    ; CR3 = PML4 address (passed in as first argument on stack)
+    mov eax, [esp + 4]
+    mov cr3, eax
+
+    ; Enable PAE (bit 5 of CR4)
+    mov eax, cr4
+    or  eax, (1 << 5)
+    mov cr4, eax
+
+    ; Enable long mode in EFER MSR (MSR 0xC0000080, bit 8)
+    mov ecx, 0xC0000080
+    rdmsr
+    or  eax, (1 << 8)
+    wrmsr
+
+    ; Enable paging (bit 31 of CR0) — this activates long mode
+    mov eax, cr0
+    or  eax, (1 << 31)
+    mov cr0, eax
+
+    ; Far jump to 64-bit CS (0x18 in our new GDT) to flush pipeline
+    jmp 0x18:long_mode_entry
+
+BITS 64
+long_mode_entry:
+    ; Reload data segments with 64-bit data selector
+    mov ax, 0x20
+    mov ds, ax
+    mov es, ax
+    mov ss, ax
+    mov fs, ax
+    mov gs, ax
+
+    ; Call 64-bit C entry — never returns
+    mov rax, 0x100000   ; address of main64.bin
+    call rax            ; call c_main_64
+    hlt

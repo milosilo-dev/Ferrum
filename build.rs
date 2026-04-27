@@ -3,7 +3,8 @@ use walkdir::WalkDir;
 
 const ASM: &str = "nasm";
 const CC: &str = "i686-elf-gcc";
-const LD: &str = "i686-elf-ld";
+const CC64: &str = "x86_64-linux-gnu-gcc";
+const LD: &str = "ld";
 const OBJ: &str = "objcopy";
 
 const FIRMWARE_PATH: &str = "guest/firmware";
@@ -34,11 +35,50 @@ fn build_firmware() {
         panic!("gcc failed to compile firmware c_main");
     }
 
+    let cc64_input = FIRMWARE_PATH.to_owned() + "/main64.c";
+    let cc64_output = FIRMWARE_PATH.to_owned() + "/main64.o";
+
+    let status = Command::new(CC64)
+        .args([
+            "-m64", "-ffreestanding", "-fno-stack-protector",
+            "-mno-red-zone", "-mcmodel=kernel", "-fno-pic", "-fno-pie",
+            "-nostdlib",
+            "-isystem", "/usr/lib/gcc/x86_64-linux-gnu/13/include",
+            "-O2", "-c",
+            cc64_input.as_str(), "-o", cc64_output.as_str()
+        ])
+        .status().expect("failed to run gcc64");
+    if !status.success() { panic!("gcc64 failed"); }
+
+    let ld64_script  = FIRMWARE_PATH.to_owned() + "/linker64.ld";
+    let ld64_elf     = FIRMWARE_PATH.to_owned() + "/main64.elf";
+    let ld64_bin     = FIRMWARE_PATH.to_owned() + "/main64.bin";
+
+    let status = Command::new("ld")
+        .args([
+            "-T", ld64_script.as_str(),
+            "-o", ld64_elf.as_str(),
+            cc64_output.as_str(),
+        ])
+        .status().expect("failed to run ld64");
+    if !status.success() { panic!("ld64 failed"); }
+
+    let status = Command::new(OBJ)
+        .args(["-O", "binary", ld64_elf.as_str(), ld64_bin.as_str()])
+        .status().expect("failed to run objcopy for main64");
+    if !status.success() { panic!("objcopy main64 failed"); }
+
     let ld_output = FIRMWARE_PATH.to_owned() + "/out.elf";
     let ld_script = FIRMWARE_PATH.to_owned() + "/linker.ld";
 
     let status = Command::new(LD)
-        .args(["-T", ld_script.as_str(), "-o", ld_output.as_str(), asm_output.as_str(), cc_output.as_str()])
+        .args([
+            "-m", "elf_i386",
+            "-T", ld_script.as_str(),
+            "-o", ld_output.as_str(),
+            asm_output.as_str(),
+            cc_output.as_str(),
+        ])
         .status()
         .expect("failed to run ld");
 

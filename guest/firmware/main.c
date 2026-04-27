@@ -1,9 +1,13 @@
+#include "paging.h"
+#include "gdt.h"
 #include "serial.h"
+#include "longmode.h"
+
 #include "rng.c"
 #include "counter.c"
 #include "blk.c"
 
-void c_main(void) {
+void c_main_32(void) {
     serial_init();
     virtio_rng_init();
     virtio_cnt_init();
@@ -32,8 +36,16 @@ void c_main(void) {
     serial_putx(sector[510]); serial_putc(' ');
     serial_putx(sector[511]); serial_puts("\n");
 
-    // spin forever
-    while (1) {
-        __asm__ volatile("hlt");
-    }
+    // Set up page tables
+    paging_init();
+
+    // Load 64-bit GDT
+    GDTPointer64 gdtp = {
+        .size = sizeof(gdt64) - 1,
+        .base = (uint32_t)gdt64
+    };
+    __asm__ volatile("lgdt %0" :: "m"(gdtp));
+
+    // Switch — jumps to c_main_64, never returns
+    enter_long_mode((uint32_t)pml4);
 }

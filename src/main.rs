@@ -19,6 +19,7 @@ fn main() {
 
     let reset_vector: Vec<u8> = vec![0xEA, 0x00, 0x7E, 0x00, 0x00];
     let firmware = fs::read("guest/firmware/out.bin").unwrap();
+    let firmware64 = fs::read("guest/firmware/main64.bin").unwrap();
 
     let mut vm = VirtualMachine::new(MachineConfig {
         memory_regions: vec![MemoryRegionConfig {
@@ -26,8 +27,9 @@ fn main() {
             mem_offset: 0x0000,
         }],
         binaries: vec![
-            Binary::new(firmware,      0x7E00),  // stage2 at 0x7E00
-            Binary::new(reset_vector,  0xFFF0),  // reset vector at top of first 64KB
+            Binary::new(firmware,       0x7E00),  // stage2 at 0x7E00
+            Binary::new(firmware64,     0x100000),
+            Binary::new(reset_vector,   0xFFF0),  // reset vector at top of first 64KB
         ],
         io_devices: vec![
             IODeviceRegion::new(0x40..=0x43, timer),

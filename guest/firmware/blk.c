@@ -23,9 +23,9 @@ void virtio_blk_init(void){
     mmio_write(VIRTIO_BLK_BASE, VIRTIO_MMIO_QUEUE_NUM, QUEUE_SIZE);
 
     // Pointers to the memory holding the respective parts of the queue
-    uint32_t desc_addr  = (uint64_t)&blk_queue.desc;
-    uint32_t avail_addr = (uint64_t)&blk_queue.avail;
-    uint32_t used_addr = (uint64_t)&blk_queue.used;
+    uint32_t desc_addr  = (uint32_t)&blk_queue.desc;
+    uint32_t avail_addr = (uint32_t)&blk_queue.avail;
+    uint32_t used_addr = (uint32_t)&blk_queue.used;
 
     // Fill the locations at the pointers with the correct values
     mmio_write(VIRTIO_BLK_BASE, VIRTIO_MMIO_QUEUE_DESC_LOW,    desc_addr);
@@ -61,19 +61,19 @@ uint8_t virtio_blk_read(uint64_t sector, uint32_t length, uint8_t* buf) {
     uint16_t d3 = (blk_next_desc + 2) % QUEUE_SIZE;
     blk_next_desc = (blk_next_desc + 3) % QUEUE_SIZE;
 
-    blk_queue.desc[d].addr      = (uint64_t)&request;
+    blk_queue.desc[d].addr      = (uint32_t)&request;
     blk_queue.desc[d].len       = 16;
     blk_queue.desc[d].flags     = VIRTQ_DESC_F_NEXT;
     blk_queue.desc[d].next      = d2;
 
-    blk_queue.desc[d2].addr     = (uint64_t)buf;
+    blk_queue.desc[d2].addr     = (uint32_t)buf;
     blk_queue.desc[d2].len      = length;
     blk_queue.desc[d2].flags    = VIRTQ_DESC_F_WRITE | VIRTQ_DESC_F_NEXT;
     blk_queue.desc[d2].next     = d3;
 
     uint8_t status = 0xFF;
 
-    blk_queue.desc[d3].addr     = (uint64_t)&status;
+    blk_queue.desc[d3].addr     = (uint32_t)&status;
     blk_queue.desc[d3].len      = 1;
     blk_queue.desc[d3].flags    = VIRTQ_DESC_F_WRITE;
     blk_queue.desc[d3].next     = 0;
@@ -110,19 +110,19 @@ uint8_t virtio_blk_write(uint64_t sector, uint32_t length, uint8_t* buf) {
     uint16_t d3 = (blk_next_desc + 2) % QUEUE_SIZE;
     blk_next_desc = (blk_next_desc + 3) % QUEUE_SIZE;
 
-    blk_queue.desc[d].addr      = (uint64_t)&request;
+    blk_queue.desc[d].addr      = (uint32_t)&request;
     blk_queue.desc[d].len       = 16;
     blk_queue.desc[d].flags     = VIRTQ_DESC_F_NEXT;
     blk_queue.desc[d].next      = d2;
 
-    blk_queue.desc[d2].addr     = (uint64_t)buf;
+    blk_queue.desc[d2].addr     = (uint32_t)buf;
     blk_queue.desc[d2].len      = length;
     blk_queue.desc[d2].flags    = VIRTQ_DESC_F_WRITE | VIRTQ_DESC_F_NEXT;
     blk_queue.desc[d2].next     = d3;
 
     uint8_t status = 0xFF;
 
-    blk_queue.desc[d3].addr     = (uint64_t)&status;
+    blk_queue.desc[d3].addr     = (uint32_t)&status;
     blk_queue.desc[d3].len      = 1;
     blk_queue.desc[d3].flags    = VIRTQ_DESC_F_WRITE;
     blk_queue.desc[d3].next     = 0;

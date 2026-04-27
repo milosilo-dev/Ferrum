@@ -23,9 +23,9 @@ void virtio_cnt_init(void){
     mmio_write(VIRTIO_CNT_BASE, VIRTIO_MMIO_QUEUE_NUM, QUEUE_SIZE);
 
     // Pointers to the memory holding the respective parts of the queue
-    uint32_t desc_addr  = (uint64_t)&cnt_queue.desc;
-    uint32_t avail_addr = (uint64_t)&cnt_queue.avail;
-    uint32_t used_addr = (uint64_t)&cnt_queue.used;
+    uint32_t desc_addr  = (uint32_t)&cnt_queue.desc;
+    uint32_t avail_addr = (uint32_t)&cnt_queue.avail;
+    uint32_t used_addr = (uint32_t)&cnt_queue.used;
 
     // Fill the locations at the pointers with the correct values
     mmio_write(VIRTIO_CNT_BASE, VIRTIO_MMIO_QUEUE_DESC_LOW,    desc_addr);
@@ -58,12 +58,12 @@ uint32_t virtio_cnt(uint32_t in) {
     uint16_t d2 = (cnt_next_desc + 1) % QUEUE_SIZE;
     cnt_next_desc = (cnt_next_desc + 2) % QUEUE_SIZE;
 
-    cnt_queue.desc[d].addr  = (uint64_t)&data.input;
+    cnt_queue.desc[d].addr  = (uint32_t)&data.input;
     cnt_queue.desc[d].len   = 4;
     cnt_queue.desc[d].flags = VIRTQ_DESC_F_WRITE | VIRTQ_DESC_F_NEXT;
     cnt_queue.desc[d].next  = d2;
 
-    cnt_queue.desc[d2].addr = (uint64_t)&data.output;
+    cnt_queue.desc[d2].addr = (uint32_t)&data.output;
     cnt_queue.desc[d2].len   = 4;
     cnt_queue.desc[d2].flags = VIRTQ_DESC_F_WRITE;
     cnt_queue.desc[d2].next  = 0;
