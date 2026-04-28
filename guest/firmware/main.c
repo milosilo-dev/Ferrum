@@ -40,7 +40,7 @@ void c_main_32(void) {
     paging_init();
 
     // Load 64-bit GDT
-    GDTPointer64 gdtp = {
+    GDTPointer32 gdtp = {
         .size = sizeof(gdt64) - 1,
         .base = (uint32_t)gdt64
     };

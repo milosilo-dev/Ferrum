@@ -56,13 +56,12 @@ impl VCPU {
                 ..Default::default()
             }
         ]).unwrap();
-        vcpu.set_msrs(&msrs).unwrap();
+        //vcpu.set_msrs(&msrs).unwrap();
 
         let mut sregs = vcpu.get_sregs().unwrap();
 
-        sregs.cr0 &= !0x1;
+        sregs.cr0 = (sregs.cr0 & !0x1) | 0x20;
         sregs.cr4 = 0;
-        sregs.efer = 0;
 
         sregs.cs = real_mode_code_seg(0, 0);
         sregs.ds = real_mode_data_seg(0, 0);

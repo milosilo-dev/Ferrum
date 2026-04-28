@@ -82,16 +82,15 @@ enter_long_mode:
     ; Read EFER
     mov ecx, 0xC0000080
     rdmsr
-
-    mov al, '4'
-    out dx, al
-
     ; Set long mode enable bit
     or eax, (1 << 8)
     wrmsr
 
+    push edx                ; save MSR[63:32] (should be 0 but be safe)
+    mov dx, 0x3F8
     mov al, '5'
     out dx, al
+    pop edx
 
     ; Enable paging
     mov eax, cr0
