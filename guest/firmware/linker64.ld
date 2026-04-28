@@ -4,7 +4,10 @@ ENTRY(c_main_64)
 SECTIONS {
     . = 0x100000;   /* load it at 1MB, well above your firmware */
 
-    .text   : { *(.text*)   }
+    .text : {
+        *(.text*)
+        guest/firmware/idt_handlers.o(.text*)
+    }
     .rodata : { *(.rodata*) }
     .data   : { *(.data*)   }
     .bss    : {

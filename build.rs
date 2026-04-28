@@ -11,11 +11,23 @@ const FIRMWARE_PATH: &str = "guest/firmware";
 const DISK_FILE: &str = "guest/disk.bin";
 
 fn build_firmware() {
-    let asm_input = FIRMWARE_PATH.to_owned() + "/entry.asm";
-    let asm_output = FIRMWARE_PATH.to_owned() + "/entry.o";
+    let asm_entry_input = FIRMWARE_PATH.to_owned() + "/entry.asm";
+    let asm_entry_output = FIRMWARE_PATH.to_owned() + "/entry.o";
 
     let status = Command::new(ASM)
-        .args(["-f", "elf32", asm_input.as_str(), "-o", asm_output.as_str()])
+        .args(["-f", "elf32", asm_entry_input.as_str(), "-o", asm_entry_output.as_str()])
+        .status()
+        .expect("failed to run nasm");
+
+    if !status.success() {
+        panic!("nasm failed to assemble firmware entry stub");
+    }
+
+    let asm_idt_input = FIRMWARE_PATH.to_owned() + "/idt_handlers.asm";
+    let asm_idt_output = FIRMWARE_PATH.to_owned() + "/idt_handlers.o";
+
+    let status = Command::new(ASM)
+        .args(["-f", "elf64", asm_idt_input.as_str(), "-o", asm_idt_output.as_str()])
         .status()
         .expect("failed to run nasm");
 
@@ -58,6 +70,7 @@ fn build_firmware() {
         .args([
             "-T", ld64_script.as_str(),
             "-o", ld64_elf.as_str(),
+            asm_idt_output.as_str(),
             cc64_output.as_str(),
         ])
         .status().expect("failed to run ld64");
@@ -76,7 +89,7 @@ fn build_firmware() {
             "-m", "elf_i386",
             "-T", ld_script.as_str(),
             "-o", ld_output.as_str(),
-            asm_output.as_str(),
+            asm_entry_output.as_str(),
             cc_output.as_str(),
         ])
         .status()

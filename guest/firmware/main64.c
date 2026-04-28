@@ -1,8 +1,10 @@
 #include "serial.h"
 #include "blk.c"
+#include "idt.h"
 
 void c_main_64(void) {
     serial_puts("Long mode!\n");
+    idt_init();
 
     uint8_t sector[512];
     uint32_t status = virtio_blk_read(0, 512, sector);
