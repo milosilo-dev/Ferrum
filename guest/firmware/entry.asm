@@ -59,25 +59,14 @@ gdt_ptr:
 
 global enter_long_mode
 enter_long_mode:
-    ; Print '1' to COM1 to confirm we entered
-    mov dx, 0x3F8
-    mov al, '1'
-    out dx, al
-
     ; Set CR3
     mov eax, [esp + 4]
     mov cr3, eax
-
-    mov al, '2'
-    out dx, al
 
     ; Enable PAE
     mov eax, cr4
     or  eax, (1 << 5)
     mov cr4, eax
-
-    mov al, '3'
-    out dx, al
 
     ; Read EFER
     mov ecx, 0xC0000080
@@ -85,12 +74,6 @@ enter_long_mode:
     ; Set long mode enable bit
     or eax, (1 << 8)
     wrmsr
-
-    push edx                ; save MSR[63:32] (should be 0 but be safe)
-    mov dx, 0x3F8
-    mov al, '5'
-    out dx, al
-    pop edx
 
     ; Enable paging
     mov eax, cr0
