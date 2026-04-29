@@ -16,6 +16,9 @@ impl Binary {
     pub fn new(data: Vec<u8>, offset: u64) -> Self {
         Self { data, offset }
     }
+    pub fn reset_vector() -> Self {
+        Self { data: vec![0xEA, 0x00, 0x7E, 0x00, 0x00], offset: 0xFFF0 }
+    }
 }
 
 pub struct MachineConfig {
@@ -26,4 +29,8 @@ pub struct MachineConfig {
     pub irq_map: Vec<IrqMap>,
 
     pub code_entry: usize,
+}
+
+impl MachineConfig {
+    pub fn inject_memmap(&mut self) {}
 }
