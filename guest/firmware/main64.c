@@ -1,5 +1,5 @@
 #include "headers/serial.h"
-#include "blk.c"
+#include "virtio/blk.c"
 #include "headers/idt.h"
 
 void c_main_64(void) {

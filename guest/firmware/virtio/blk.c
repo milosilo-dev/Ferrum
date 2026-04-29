@@ -1,6 +1,6 @@
-#include "headers/serial.h"
-#include "headers/virtio_mmio.h"
-#include "headers/virtqueue.h"
+#include "../headers/serial.h"
+#include "../headers/virtio_mmio.h"
+#include "../headers/virtqueue.h"
 #include <stdint.h>
 #include <stdbool.h>
 

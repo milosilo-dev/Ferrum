@@ -3,9 +3,9 @@
 #include "headers/serial.h"
 #include "headers/longmode.h"
 
-#include "rng.c"
-#include "counter.c"
-#include "blk.c"
+#include "virtio/rng.c"
+#include "virtio/counter.c"
+#include "virtio/blk.c"
 
 void c_main_32(void) {
     serial_init();
