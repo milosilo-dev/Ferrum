@@ -51,6 +51,10 @@ impl MMIODeviceRegion {
     pub fn pass_guest_memory(&mut self, guest_memory:Arc<Mutex<Vec<MemoryRegion>>>) {
         self.mmio_device.pass_guest_memory(guest_memory);
     }
+
+    pub fn get_range(&self) -> RangeInclusive<u64> {
+        self.addr_range.clone()
+    }
 }
 
 pub struct MMIODeviceMap {

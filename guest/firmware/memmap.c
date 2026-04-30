@@ -5,7 +5,7 @@ typedef struct {
     uint64_t base;
     uint64_t length;
     uint32_t type;
-} MemMapEntry;
+} __attribute__((packed)) MemMapEntry;
 
 MemMapEntry memmap[MEMMAP_MAX_ENTRIES];
 

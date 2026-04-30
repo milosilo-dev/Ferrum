@@ -5,7 +5,7 @@ use kvm_ioctls::Kvm;
 use libc::{MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE, mmap};
 use vmm_sys_util::fam::FamStructWrapper;
 
-use crate::{device_maps::{io::{IODeviceMap, IODeviceRegion}, mmio::{MMIODeviceMap, MMIODeviceRegion}}, irq::handler::IRQHandler, machine_config::MachineConfig, memory_region::MemoryRegion, vcpu::VCPU, vm::{tick::TickContext, vm::VirtualMachine}};
+use crate::{device_maps::{io::{IODeviceMap, IODeviceRegion}, mmio::{MMIODeviceMap, MMIODeviceRegion}}, irq::handler::IRQHandler, machine_config::machine_config::MachineConfig, memory_region::MemoryRegion, vcpu::VCPU, vm::{tick::TickContext, vm::VirtualMachine}};
 
 impl VirtualMachine {
     pub fn new(mut machine_config: MachineConfig) -> Self {

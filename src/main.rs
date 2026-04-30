@@ -4,7 +4,7 @@ use ferrumvm::{
     device_maps::{io::IODeviceRegion, mmio::MMIODeviceRegion},
     devices::{cmos::Cmos, serial::Serial, timer::Pit, virtio::{devices::{blk::BlkVirtio, counter::CntVirtio, rng::RngVirtio}, transports::mmio::MMIOTransport}},
     irq::map::IrqMap,
-    machine_config::{Binary, MachineConfig, MemoryRegionConfig},
+    machine_config::{binary::Binary, machine_config::{MachineConfig, MemoryRegionConfig}},
     vm::vm::VirtualMachine,
 };
 
