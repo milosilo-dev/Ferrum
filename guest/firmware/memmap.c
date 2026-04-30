@@ -15,7 +15,7 @@ typedef struct {
 MemMapEntry memmap[MEMMAP_MAX_ENTRIES];
 
 void init_memmap() {
-    MemMapHeader header = (struct MemMapHeader *)0x7000;
+    MemMapHeader* header = (MemMapHeader *)0x7000;
     serial_puts("Mgk num: ");
-    serial_putx(header.mgk_num);
+    serial_putx(header->mgk_num);
 }

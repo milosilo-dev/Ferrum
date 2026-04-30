@@ -37,6 +37,18 @@ fn build_firmware() {
         panic!("nasm failed to assemble firmware entry stub");
     }
 
+    let asm_entry64_input = FIRMWARE_PATH.to_owned() + "/assembly/entry64.asm";
+    let asm_entry64_output = FIRMWARE_PATH.to_owned() + "/build/entry64.o";
+
+    let status = Command::new(ASM)
+        .args(["-f", "elf64", asm_entry64_input.as_str(), "-o", asm_entry64_output.as_str()])
+        .status()
+        .expect("failed to run nasm");
+
+    if !status.success() {
+        panic!("nasm failed to assemble firmware entry stub");
+    }
+
     let cc_input = FIRMWARE_PATH.to_owned() + "/main.c";
     let cc_output = FIRMWARE_PATH.to_owned() + "/build/main.o";
 
