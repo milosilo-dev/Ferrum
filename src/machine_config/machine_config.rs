@@ -42,6 +42,21 @@ impl MachineConfig {
             });
         }
         // Convert it to bytes
+        let mut memmap_bytes: Vec<u8> = vec![];
+        for mem_map_entry in &mut mem_map{
+            let memmap_entry_bytes = mem_map_entry.as_bytes();
+            memmap_bytes.extend_from_slice(&memmap_entry_bytes);
+        }
+
+        let memmap2_entry = MemMap{
+            base: 0x7000,
+            length: (mem_map.len() as u64 + 1) * 20,
+            mem_type: 0,
+        };
+        let memmap_entry_bytes = memmap2_entry.as_bytes();
+        memmap_bytes.extend_from_slice(&memmap_entry_bytes);
+
         // inject it as new binary
+        self.binaries.push(Binary { data: memmap_bytes, offset: 0x7000 });
     }
 }
