@@ -12,6 +12,8 @@ typedef uint64_t EFI_VIRTUAL_ADDRESS;
 #define EFI_NOT_FOUND    0x800000000000000E
 #define EFI_BUFFER_TOO_SMALL 0x8000000000000005
 
+typedef unsigned long long UINTN;
+
 typedef struct {
     uint32_t Data1;
     uint16_t Data2;
@@ -35,6 +37,30 @@ typedef struct {
     uint64_t NumberOfPages;
     uint64_t Attribute;
 } EFI_MEMORY_DESCRIPTOR;
+
+typedef struct {
+  uint64_t Signature;
+  uint32_t Revision;
+  uint32_t HeaderSize;
+  uint32_t CRC32;
+  uint32_t Reserved;
+} EFI_TABLE_HEADER;
+
+typedef struct {
+    EFI_TABLE_HEADER    Hdr;
+    char16_t*           FirmwareVendor;
+    uint32_t            FirmwareRevision;
+    void*               ConsoleInHandle;
+    void*               ConIn;
+    void*               ConsoleOutHandle;
+    void*               ConOut;
+    void*               StandardErrorHandle;
+    void*               StdErr;
+    void*               RuntimeServices;
+    void*               BootServices;
+    UINTN               NumberOfTableEntries;
+    void*               ConfigurationTable;
+} EFI_SYSTEM_TABLE;
 
 #define EfiLoaderCode        1
 #define EfiLoaderData        2
