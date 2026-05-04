@@ -28,8 +28,6 @@ void init_memmap() {
         for (int i = 0; i < length; i++) {
             if (i - 1 < MEMMAP_MAX_ENTRIES) {
                 MemMapEntry* entry = (MemMapEntry *)((uint8_t *)0x7000 + 8 + i * 20);
-                serial_puts("mem_map: Entry ");
-                serial_putx(i); serial_puts("\n");
 
                 memmap[i] = *entry;
             }

@@ -1,6 +1,7 @@
 #include "headers/serial.h"
 #include "virtio/blk.c"
 #include "headers/idt.h"
+#include "disk/load_part_table.c"
 #include "memmap.c"
 
 void c_main_64(void) {
@@ -9,12 +10,7 @@ void c_main_64(void) {
     init_memmap();
     virtio_blk_init();
 
-    uint8_t sector[512];
-    uint32_t status = virtio_blk_read(0, 512, sector);
-    serial_puts("virtio-blk: status = "); serial_putx(status); serial_puts("\n");
-    serial_puts("virtio-blk: MBR sig = ");
-    serial_putx(sector[510]); serial_putc(' ');
-    serial_putx(sector[511]); serial_puts("\n");
+    load_part_table();
 
     // spin forever
     while (1) {

@@ -22,14 +22,6 @@ typedef struct {
 } EFI_GUID;
 
 typedef struct {
-    uint64_t Signature;
-    uint32_t Revision;
-    uint32_t HeaderSize;
-    uint32_t CRC32;
-    uint32_t Reserved;
-} EFI_TABLE_HEADER;
-
-typedef struct {
     uint32_t Type;
     uint32_t Pad;
     EFI_PHYSICAL_ADDRESS PhysicalStart;
