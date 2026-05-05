@@ -1,0 +1,10 @@
+#pragma once
+#define SUCCSESS 0
+#define INVALID_BOOT_SIGNITURE 1
+#define CORRUPT_GPT 2
+#define CORRUPT_MBR 3
+#define IO_ERROR 4
+#define NOT_GPT 5
+#define INVALID_REVSION 6
+#define INVALID_FAT_SECTOR_SIZE 7
+#define INVALID_FAT_CLUSTER_SIZE 8

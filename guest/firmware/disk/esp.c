@@ -1,19 +1,16 @@
 #include <stdint.h>
 #include "../headers/memcmp.h"
+#include "../headers/sector_range.h"
 #include "../headers/gpt.h"
+#include "../headers/errors.h"
 
-#define PART_LOAD_SUCCSESS 0;
-#define INVALID_BOOT_SIGNITURE 1;
-#define CORRUPT_GPT 2;
-#define CORRUPT_MBR 3;
-#define IO_ERROR 4;
-#define NOT_GPT 5;
-#define INVALID_REVSION 6;
-
-typedef struct {
-    uint64_t first_sector;
-    uint64_t last_sector;
-} __attribute__((packed)) SectorRange;
+const uint8_t esp_guid[16] = {
+    0x28, 0x73, 0x2A, 0xC1,  // reversed
+    0x1F, 0xF8,              // reversed
+    0xD2, 0x11,              // reversed
+    0xBA, 0x4B,              // same
+    0x00, 0xA0, 0xC9, 0x3E, 0xC9, 0x3B // same
+};
 
 int load_part_table(SectorRange* range) {
     uint8_t sector[512];
@@ -52,7 +49,7 @@ int load_part_table(SectorRange* range) {
         return CORRUPT_GPT;
     }
 
-    if (gpt_header->revision == 0x0001000) {
+    if (gpt_header->revision != 0x00010000) {
         serial_puts("part-table: Incompatible revision");
         return INVALID_REVSION;
     }
@@ -66,10 +63,13 @@ int load_part_table(SectorRange* range) {
     uint64_t sectors = (table_bytes + 511) / 512;
 
     uint8_t part_entries_buf[sectors * 512];
-    status = virtio_blk_read(table_lba, sectors * 512 / 512, part_entries_buf);
+    status = virtio_blk_read(table_lba, sectors * 512, part_entries_buf);
+    if (status != 0) {
+        serial_puts("part-table: Failed to read partition table\n");
+        return IO_ERROR;
+    }
 
     for (uint32_t i = 0; i < entry_count; i++) {
-
         GPTPartitionEntry *entry =
             (GPTPartitionEntry*)(part_entries_buf + i * entry_size);
 
@@ -88,7 +88,14 @@ int load_part_table(SectorRange* range) {
         serial_puts("part-table: Entry ");
         serial_putx(i);
         serial_puts(" valid\n");
+
+        if (memcmp(entry->type_guid, esp_guid, 16) == 0) {
+            serial_puts("part-table: Found EFI System Partition\n");
+            range->first_sector = entry->first_lba;
+            range->last_sector = entry->last_lba;
+            break;
+        }
     }
 
-    return PART_LOAD_SUCCSESS;
+    return SUCCSESS;
 }
