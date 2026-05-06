@@ -71,7 +71,7 @@ impl MachineConfig {
         let memmap2_entry = MemMap{
             base: 0x7000,
             length: (mem_map.len() as u64 + 1) * 20 + 8,
-            mem_type: 2,
+            mem_type: MemMapType::Reserved as u32,
         };
         let memmap_entry_bytes = memmap2_entry.as_bytes();
         memmap_bytes.extend_from_slice(&memmap_entry_bytes);

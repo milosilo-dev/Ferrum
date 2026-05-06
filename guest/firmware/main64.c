@@ -4,19 +4,22 @@
 #include "headers/sector_range.h"
 #include "disk/esp.c"
 #include "disk/fat32.c"
-#include "memmap.c"
+#include "mem/stack.c"
+#include "mem/memmap.c"
+#include "mem/heap.c"
 
 void c_main_64(void) {
     serial_puts("=-- Long mode --=\n");
     idt_init();
     init_memmap();
+    init_heap(0x00200000, 0x00300000);
     virtio_blk_init();
 
     SectorRange sec_range;
     int status = load_part_table(&sec_range);
     if (status != 0) return;
 
-    Fat32_Handle fs;
+    static Fat32_Handle fs;
     status = open_fat32(&sec_range, &fs);
     if (status != 0) return;
 
@@ -65,11 +68,14 @@ void c_main_64(void) {
         return;
     }
 
-    uint8_t file_buf[4096];
+    static uint8_t file_buf[4096];
     read_file(&fs, entry, file_buf, sizeof(file_buf));
     for (int i = 0; i < 10; i++) {
         serial_putx(file_buf[i]);
     }
+    serial_puts("\n");
+
+    print_stack_usage();
 
     // spin forever
     while (1) {

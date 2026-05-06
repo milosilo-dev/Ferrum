@@ -1,7 +1,6 @@
-pub enum MemMapType{
-    Undefined,
-    Usable,
-    Reserved,
+pub enum MemMapType {
+    Reserved = 0,
+    Usable = 1,
 }
 
 pub struct MemMap{
