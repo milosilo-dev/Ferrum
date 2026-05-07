@@ -1,6 +1,12 @@
 #pragma once
 #include <stdint.h>
 
+#if defined(__x86_64__) || defined(_M_X64)
+    #define EFIAPI __attribute__((ms_abi))
+#else
+    #define EFIAPI
+#endif
+
 typedef uint64_t EFI_STATUS;
 typedef void*    EFI_HANDLE;
 typedef void*    EFI_EVENT;
@@ -53,6 +59,11 @@ typedef struct {
     UINTN               NumberOfTableEntries;
     void*               ConfigurationTable;
 } EFI_SYSTEM_TABLE;
+
+typedef uint64_t (EFIAPI *EFI_IMAGE_ENTRY_POINT)(
+    void *ImageHandle,   // EFI_HANDLE
+    void *SystemTable    // EFI_SYSTEM_TABLE*
+);
 
 #define EfiLoaderCode        1
 #define EfiLoaderData        2
