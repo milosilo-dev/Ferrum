@@ -4,6 +4,10 @@
 #include "../uefi.c"
 
 void format_pe(uint8_t* exe) {
+    serial_puts("Image base: ");
+    serial_putx((uint64_t)exe);
+    serial_puts("\n");
+
     EFI_IMAGE_DOS_HEADER* dos_header = (EFI_IMAGE_DOS_HEADER*)exe;
     IMAGE_NT_HEADERS64* nt_header = (IMAGE_NT_HEADERS64*)(dos_header->e_lfanew + (uint64_t)exe);
 
@@ -21,7 +25,7 @@ void format_pe(uint8_t* exe) {
 
     uint32_t ep_rva = nt_header->OptionalHeader.AddressOfEntryPoint;
 
-    serial_puts("Entry RVA: ");
+    serial_puts("pe_exe: Entry RVA: ");
     serial_putx(ep_rva);
     serial_puts("\n");
 
@@ -39,6 +43,15 @@ void format_pe(uint8_t* exe) {
     handle_data->loaded_image.SystemTable = system_table;
 
     EFI_HANDLE image_handle = handle_data;
+
+    print_stack_usage();
+    serial_puts("Entry point va: ");
+    serial_putx((uint64_t)entry);
+    serial_puts("\nStack pointer: ");
+    uint64_t rsp;
+    __asm__ volatile("mov %%rsp, %0" : "=r"(rsp));
+    serial_putx(rsp);
+    serial_puts("\n");
 
     entry(image_handle, system_table);
 }

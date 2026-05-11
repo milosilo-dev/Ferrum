@@ -5,8 +5,8 @@
 #include "mem/heap.c"
 #include "disk/esp.c"
 #include "disk/fat32.c"
-#include "disk/format_PE.c"
 #include "mem/stack.c"
+#include "disk/format_PE.c"
 #include "mem/memmap.c"
 
 void c_main_64(void) {
