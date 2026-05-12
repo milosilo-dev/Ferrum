@@ -3,55 +3,125 @@
 #include "../headers/uefi/image_handle.h"
 #include "../uefi.c"
 
+// Base relocation block header
+typedef struct {
+    uint32_t VirtualAddress;
+    uint32_t SizeOfBlock;
+} BASE_RELOCATION_BLOCK;
+
+// Each relocation entry is a 16-bit value:
+// top 4 bits = type, bottom 12 bits = offset within page
+#define IMAGE_REL_BASED_ABSOLUTE 0
+#define IMAGE_REL_BASED_DIR64    10
+
+static void apply_relocations(uint8_t* load_base, IMAGE_NT_HEADERS64* nt) {
+    IMAGE_DATA_DIRECTORY* reloc_dir =
+        &nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+
+    if (reloc_dir->Size == 0) {
+        serial_puts("pe_exe: no relocation table, assuming load at ImageBase\n");
+        return;
+    }
+
+    int64_t delta = (int64_t)load_base - (int64_t)nt->OptionalHeader.ImageBase;
+    if (delta == 0) return;  // loaded at preferred base, nothing to fix up
+
+    uint8_t* reloc_data     = load_base + reloc_dir->VirtualAddress;
+    uint8_t* reloc_data_end = reloc_data + reloc_dir->Size;
+
+    while (reloc_data < reloc_data_end) {
+        BASE_RELOCATION_BLOCK* block = (BASE_RELOCATION_BLOCK*)reloc_data;
+        if (block->SizeOfBlock == 0) break;
+
+        uint32_t entry_count = (block->SizeOfBlock - sizeof(BASE_RELOCATION_BLOCK)) / 2;
+        uint16_t* entries    = (uint16_t*)(reloc_data + sizeof(BASE_RELOCATION_BLOCK));
+
+        for (uint32_t i = 0; i < entry_count; i++) {
+            uint8_t  type   = entries[i] >> 12;
+            uint16_t offset = entries[i] & 0x0FFF;
+
+            if (type == IMAGE_REL_BASED_ABSOLUTE) continue;  // padding, skip
+
+            if (type == IMAGE_REL_BASED_DIR64) {
+                uint64_t* target = (uint64_t*)(load_base + block->VirtualAddress + offset);
+                *target += delta;
+            } else {
+                serial_puts("pe_exe: unknown relocation type, skipping\n");
+            }
+        }
+
+        reloc_data += block->SizeOfBlock;
+    }
+}
+
 void format_pe(uint8_t* exe) {
-    serial_puts("Image base: ");
-    serial_putx((uint64_t)exe);
-    serial_puts("\n");
+    EFI_IMAGE_DOS_HEADER* dos = (EFI_IMAGE_DOS_HEADER*)exe;
+    if (dos->e_magic != 0x5A4D) { serial_puts("pe_exe: bad DOS magic\n"); return; }
 
-    EFI_IMAGE_DOS_HEADER* dos_header = (EFI_IMAGE_DOS_HEADER*)exe;
-    IMAGE_NT_HEADERS64* nt_header = (IMAGE_NT_HEADERS64*)(dos_header->e_lfanew + (uint64_t)exe);
+    IMAGE_NT_HEADERS64* nt = (IMAGE_NT_HEADERS64*)(exe + dos->e_lfanew);
+    if (nt->Signature != 0x00004550)  { serial_puts("pe_exe: bad NT sig\n");  return; }
+    if (nt->OptionalHeader.Magic != 0x20B) { serial_puts("pe_exe: not PE32+\n"); return; }
 
-    serial_puts("pe_exe: Dos Magic value = ");
-    serial_putx(dos_header->e_magic);
-    serial_puts("\n");
+    serial_puts("pe_exe: Dos Magic     = "); serial_putx(dos->e_magic);                       serial_puts("\n");
+    serial_puts("pe_exe: NT Signature  = "); serial_putx(nt->Signature);                      serial_puts("\n");
+    serial_puts("pe_exe: NT Magic      = "); serial_putx(nt->OptionalHeader.Magic);            serial_puts("\n");
+    serial_puts("pe_exe: Sections      = "); serial_putx(nt->FileHeader.NumberOfSections);     serial_puts("\n");
+    serial_puts("pe_exe: ImageBase     = "); serial_putx(nt->OptionalHeader.ImageBase);        serial_puts("\n");
+    serial_puts("pe_exe: SizeOfImage   = "); serial_putx(nt->OptionalHeader.SizeOfImage);      serial_puts("\n");
+    serial_puts("pe_exe: Entry RVA     = "); serial_putx(nt->OptionalHeader.AddressOfEntryPoint); serial_puts("\n");
 
-    serial_puts("pe_exe: NT Signiture = ");
-    serial_putx(nt_header->Signature);
-    serial_puts("\n");
+    // Pick a safe load address — well away from heap (0x400000-0x800000)
+    // and stack (top of low memory). 1MB aligned, plenty of room.
+    uint8_t* load_base = (uint8_t*)0x1000000;  // 16MB mark
 
-    serial_puts("pe_exe: NT Magic number = ");
-    serial_putx(nt_header->OptionalHeader.Magic);
-    serial_puts("\n");
+    serial_puts("pe_exe: load base     = "); serial_putx((uint64_t)load_base); serial_puts("\n");
 
-    uint32_t ep_rva = nt_header->OptionalHeader.AddressOfEntryPoint;
+    // Copy headers
+    memcpy(load_base, exe, nt->OptionalHeader.SizeOfHeaders);
 
-    serial_puts("pe_exe: Entry RVA: ");
-    serial_putx(ep_rva);
-    serial_puts("\n");
+    // Copy sections
+    IMAGE_SECTION_HEADER* sections = (IMAGE_SECTION_HEADER*)(
+        (uint8_t*)&nt->OptionalHeader + nt->FileHeader.SizeOfOptionalHeader
+    );
 
-    uint64_t image_base = (uint64_t)nt_header->OptionalHeader.ImageBase;
-    EFI_IMAGE_ENTRY_POINT entry = (EFI_IMAGE_ENTRY_POINT)(image_base + ep_rva);
+    for (uint16_t i = 0; i < nt->FileHeader.NumberOfSections; i++) {
+        uint8_t* dst       = load_base + sections[i].VirtualAddress;
+        uint8_t* src       = exe       + sections[i].PointerToRawData;
+        uint32_t raw_size  = sections[i].SizeOfRawData;
+        uint32_t virt_size = sections[i].Misc.VirtualSize;
 
-    EFI_SYSTEM_TABLE* system_table = (EFI_SYSTEM_TABLE*)malloc(sizeof(EFI_SYSTEM_TABLE));
+        serial_puts("pe_exe: section rva="); serial_putx(sections[i].VirtualAddress);
+        serial_puts(" raw=");               serial_putx(raw_size);
+        serial_puts(" virt=");              serial_putx(virt_size);
+        serial_puts("\n");
+
+        if (raw_size > 0)
+            memcpy(dst, src, raw_size);
+        if (virt_size > raw_size)
+            memset(dst + raw_size, 0, virt_size - raw_size);
+    }
+
+    // Apply relocations — delta is load_base minus preferred base
+    // Since ImageBase is 0, delta == load_base exactly
+    apply_relocations(load_base, nt);
+
+    // Build fake UEFI environment
+    EFI_SYSTEM_TABLE* system_table = malloc(sizeof(EFI_SYSTEM_TABLE));
+    memset(system_table, 0, sizeof(EFI_SYSTEM_TABLE));
     format_system_table(system_table);
 
     FAKE_IMAGE_HANDLE_DATA* handle_data = malloc(sizeof(FAKE_IMAGE_HANDLE_DATA));
-
-    // Fill in loaded image protocol fields
-    handle_data->loaded_image.ImageBase = exe;
-    handle_data->loaded_image.ImageSize = nt_header->OptionalHeader.SizeOfImage;
+    memset(handle_data, 0, sizeof(FAKE_IMAGE_HANDLE_DATA));
+    handle_data->loaded_image.ImageBase   = load_base;
+    handle_data->loaded_image.ImageSize   = nt->OptionalHeader.SizeOfImage;
     handle_data->loaded_image.SystemTable = system_table;
 
     EFI_HANDLE image_handle = handle_data;
 
-    print_stack_usage();
-    serial_puts("Entry point va: ");
-    serial_putx((uint64_t)entry);
-    serial_puts("\nStack pointer: ");
-    uint64_t rsp;
-    __asm__ volatile("mov %%rsp, %0" : "=r"(rsp));
-    serial_putx(rsp);
-    serial_puts("\n");
+    uint64_t ep = (uint64_t)load_base + nt->OptionalHeader.AddressOfEntryPoint;
+    serial_puts("pe_exe: jumping to    = "); serial_putx(ep); serial_puts("\n");
 
-    entry(image_handle, system_table);
+    EFI_IMAGE_ENTRY_POINT entry = (EFI_IMAGE_ENTRY_POINT)ep;
+    EFI_STATUS status = entry(image_handle, system_table);
+    serial_puts("pe_exe: entry returned = "); serial_putx(status); serial_puts("\n");
 }

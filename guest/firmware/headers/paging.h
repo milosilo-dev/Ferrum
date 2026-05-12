@@ -19,6 +19,6 @@ static inline void paging_init(void) {
 
     // PD[0..511] → identity map first 1GB in 2MB chunks
     for (int i = 0; i < 512; i++) {
-        pd[i] = ((uint32_t)i * 0x200000) | PAGE_PRESENT | PAGE_WRITE | PAGE_HUGE;
+        pd[i] = ((uint64_t)i * 0x200000ULL) | PAGE_PRESENT | PAGE_WRITE | PAGE_HUGE;
     }
 }

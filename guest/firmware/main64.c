@@ -8,12 +8,26 @@
 #include "mem/stack.c"
 #include "disk/format_PE.c"
 #include "mem/memmap.c"
+#include "tss.c"
+#include "headers/gdt.h"
 
 void c_main_64(void) {
     serial_puts("=-- Long mode --=\n");
+
+    tss_init();
+    gdt_set_tss(gdt64, 3);
+    GDTPointer64 gdtp = {
+        .size = sizeof(gdt64) - 1,
+        .base = (uint64_t)gdt64
+    };
+    __asm__ volatile("lgdt %0" :: "m"(gdtp));
+    tss_enable(3 * 8);
+    
+    idt_init();
+
     idt_init();
     init_memmap();
-    init_heap(0x00200000, 0x00300000);
+    init_heap(0x00400000, 0x00800000);
     virtio_blk_init();
 
     SectorRange sec_range;
@@ -58,7 +72,7 @@ void c_main_64(void) {
     open_dir_entry(&fs, entry);
     int found_exe = 0;
     while (next_dir_entry(&fs, &entry) == SUCCSESS) {
-        if (memcmp(entry->name, "BOOTX64 EFI ", 11) == 0){
+        if (memcmp(entry->name, "BOOTX64 EFI", 11) == 0){
             found_exe = 1;
             break;
         }
@@ -71,7 +85,7 @@ void c_main_64(void) {
 
     uint8_t* file_buf = malloc(entry->file_size);
 
-    read_file(&fs, entry, file_buf, sizeof(file_buf));
+    read_file(&fs, entry, file_buf, entry->file_size);
     for (int i = 0; i < 10; i++) {
         serial_putx(file_buf[i]);
     }

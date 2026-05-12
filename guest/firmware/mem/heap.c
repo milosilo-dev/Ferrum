@@ -24,9 +24,14 @@ void* malloc(uint64_t size) {
 }
 
 int memcpy(void* dst, void* src, uint64_t len){
-    return 0;
+    uint8_t* d = (uint8_t*)dst;
+    const uint8_t* s = (const uint8_t*)src;
+    for (uint64_t i = 0; i < len; i++)
+        d[i] = s[i];
 }
 
 int memset(void* buf, uint8_t val, uint64_t size){
-   return 0;
+    uint8_t* d = (uint8_t*)buf;
+    for (uint64_t i = 0; i < size; i++)
+        d[i] = val;
 }

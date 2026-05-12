@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "mem/heap.c"
 
 typedef struct {
     uint32_t reserved0;
