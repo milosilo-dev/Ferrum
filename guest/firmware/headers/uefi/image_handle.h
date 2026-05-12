@@ -2,4 +2,4 @@
 
 typedef struct {
     EFI_LOADED_IMAGE_PROTOCOL loaded_image;
-} FAKE_IMAGE_HANDLE_DATA;
+} EFI_IMAGE_HANDLE_DATA;

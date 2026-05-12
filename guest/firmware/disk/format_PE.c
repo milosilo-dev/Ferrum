@@ -110,12 +110,9 @@ void format_pe(uint8_t* exe) {
     memset(system_table, 0, sizeof(EFI_SYSTEM_TABLE));
     format_system_table(system_table);
 
-    FAKE_IMAGE_HANDLE_DATA* handle_data = malloc(sizeof(FAKE_IMAGE_HANDLE_DATA));
-    memset(handle_data, 0, sizeof(FAKE_IMAGE_HANDLE_DATA));
-    handle_data->loaded_image.ImageBase   = load_base;
-    handle_data->loaded_image.ImageSize   = nt->OptionalHeader.SizeOfImage;
-    handle_data->loaded_image.SystemTable = system_table;
-
+    EFI_IMAGE_HANDLE_DATA* handle_data = malloc(sizeof(EFI_IMAGE_HANDLE_DATA));
+    memset(handle_data, 0, sizeof(EFI_IMAGE_HANDLE_DATA));
+    format_handle_data(handle_data, system_table, nt->OptionalHeader.SizeOfImage, load_base);
     EFI_HANDLE image_handle = handle_data;
 
     uint64_t ep = (uint64_t)load_base + nt->OptionalHeader.AddressOfEntryPoint;

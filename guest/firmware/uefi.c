@@ -1,4 +1,5 @@
 #include "headers/uefi/uefi.h"
+#include "headers/uefi/crc32.h"
 #include "mem/heap.c"
 
 #define STUB(name, ret) \
@@ -31,14 +32,37 @@ static EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL gConOut = {
     .ClearScreen  = NULL,
 };
 
+// Heap mem
+
+static EFI_STATUS EFIAPI efi_AllocatePool(
+    EFI_MEMORY_TYPE type,
+    UINTN size,
+    VOID **out
+) {
+    void* ptr = malloc(size);
+    if (!ptr) return EFI_OUT_OF_RESOURCES;
+    *out = ptr;
+    return EFI_SUCCESS;
+}
+
+static EFI_STATUS EFIAPI efi_AllocatePages(
+    EFI_ALLOCATE_TYPE type,
+    EFI_MEMORY_TYPE memory_type,
+    UINTN pages,
+    EFI_PHYSICAL_ADDRESS *memory
+) {
+    void* ptr = malloc(pages * 4096);
+    if (!ptr) return EFI_OUT_OF_RESOURCES;
+    *memory = (EFI_PHYSICAL_ADDRESS)ptr;
+    return EFI_SUCCESS;
+}
+
 // ── boot service stubs ────────────────────────────────────────────
 
 STUB(RaiseTPL,                      EFI_SUCCESS)
 STUB(RestoreTPL,                    EFI_SUCCESS)
-STUB(AllocatePages,                 EFI_OUT_OF_RESOURCES)
 STUB(FreePages,                     EFI_SUCCESS)
 STUB(GetMemoryMap,                  EFI_BUFFER_TOO_SMALL)
-STUB(AllocatePool,                  EFI_OUT_OF_RESOURCES)
 STUB(FreePool,                      EFI_SUCCESS)
 STUB(CreateEvent,                   EFI_SUCCESS)
 STUB(SetTimer,                      EFI_SUCCESS)
@@ -89,14 +113,14 @@ static EFI_BOOT_SERVICES gBootServices = {
         .Revision   = EFI_BOOT_SERVICES_REVISION,
         .HeaderSize = sizeof(EFI_BOOT_SERVICES),
         .CRC32      = 0,
-        .Reserved   = 0,
+        .Reserved   = 0
     },
     .RaiseTPL                           = (void*)stub_RaiseTPL,
     .RestoreTPL                         = (void*)stub_RestoreTPL,
-    .AllocatePages                      = (void*)stub_AllocatePages,
+    .AllocatePages                      = (void*)efi_AllocatePages,
     .FreePages                          = (void*)stub_FreePages,
     .GetMemoryMap                       = (void*)stub_GetMemoryMap,
-    .AllocatePool                       = (void*)stub_AllocatePool,
+    .AllocatePool                       = (void*)efi_AllocatePool,
     .FreePool                           = (void*)stub_FreePool,
     .CreateEvent                        = (void*)stub_CreateEvent,
     .SetTimer                           = (void*)stub_SetTimer,
@@ -171,9 +195,22 @@ void format_system_table(EFI_SYSTEM_TABLE *st) {
     st->StandardErrorHandle = NULL;
     st->StdErr              = NULL;
 
+    gBootServices.Hdr.CRC32 = crc32((uint8_t*)&gBootServices, 
+            gBootServices.Hdr.HeaderSize);
     st->BootServices    = &gBootServices;
+
+    gRuntimeServices.Hdr.CRC32 = crc32((uint8_t*)&gRuntimeServices, 
+        gRuntimeServices.Hdr.HeaderSize);
     st->RuntimeServices = &gRuntimeServices;
 
     st->NumberOfTableEntries = 0;
     st->ConfigurationTable   = NULL;
+
+    st->Hdr.CRC32 = crc32((uint8_t*)st, st->Hdr.HeaderSize);
+}
+
+void format_handle_data(EFI_IMAGE_HANDLE_DATA* handle_data, EFI_SYSTEM_TABLE *st, uint32_t image_size, uint8_t* load_base) {
+    handle_data->loaded_image.ImageBase   = load_base;
+    handle_data->loaded_image.ImageSize   = image_size;
+    handle_data->loaded_image.SystemTable = st;
 }
