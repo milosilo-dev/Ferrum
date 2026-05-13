@@ -1,7 +1,7 @@
 use std::ops::{Range};
 
 use crate::{
-    device_maps::{io::IODeviceRegion, mmio::MMIODeviceRegion}, irq::map::IrqMap, machine_config::{acpi::{dsdt::load_dsdt, fadt::build_fadt}, binary::Binary, mem_map::{MemMap, MemMapHeader, MemMapType}},
+    device_maps::{io::IODeviceRegion, mmio::MMIODeviceRegion}, irq::map::IrqMap, machine_config::{acpi::{dsdt::load_dsdt, fadt::build_fadt, rsdt::{self, build_rsdt}}, binary::Binary, mem_map::{MemMap, MemMapHeader, MemMapType}},
 };
 
 pub struct MemoryRegionConfig {
@@ -83,8 +83,10 @@ impl MachineConfig {
     pub fn inject_acpi_tables(&mut self) {
         let dsdt_bin = load_dsdt();
         let fadt_bin = build_fadt(dsdt_bin.offset);
+        let rsdt_bin = build_rsdt();
 
         self.binaries.push(dsdt_bin);
         self.binaries.push(fadt_bin);
+        self.binaries.push(rsdt_bin);
     }
 }
