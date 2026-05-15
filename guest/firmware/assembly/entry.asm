@@ -38,7 +38,7 @@ protected_entry:
     mov gs, ax
 
     ; Set up a proper 32-bit stack
-    mov esp, 0x00380000
+    mov esp, 0x3000000
 
     ; Call into C - never returns
     extern c_main_32
@@ -63,9 +63,12 @@ enter_long_mode:
     mov eax, [esp + 4]
     mov cr3, eax
 
-    ; Enable PAE
+    ; Enable PAE, SSE, NX
     mov eax, cr4
-    or  eax, (1 << 5)
+    or  eax, (1 << 5)  ; PAE
+    or  eax, (1 << 9)  ; OSFXSR — enable SSE
+    or  eax, (1 << 10) ; OSXMMEXCPT — SSE exception
+    or  eax, (1 << 11) ; NXE — NX bit in page tables
     mov cr4, eax
 
     ; Read EFER

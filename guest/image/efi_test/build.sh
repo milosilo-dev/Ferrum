@@ -6,12 +6,14 @@ CC="x86_64-w64-mingw32-gcc"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 INPUT="${SCRIPT_DIR}/main.c"
+RUNTIME="${SCRIPT_DIR}/runtime.c"
 OUTPUT="${SCRIPT_DIR}/BOOTX64.EFI"
 
 echo "[*] Compiling EFI application..."
 
 $CC \
     -ffreestanding \
+    -fno-builtin \
     -fshort-wchar \
     -mno-red-zone \
     -fno-stack-protector \
@@ -22,12 +24,11 @@ $CC \
     -nostdlib \
     -Wall \
     -Wextra \
-    -Wl,--subsystem,10 \
-    -Wl,-entry,efi_main \
     -shared \
+    -Wl,--subsystem,10 \
+    -Wl,--entry,efi_main \
     "$INPUT" \
+    "$RUNTIME" \
     -o "$OUTPUT"
-
-rm -r ${SCRIPT_DIR}/main.elf ${SCRIPT_DIR}/main.o
 
 echo "[+] Built $OUTPUT"

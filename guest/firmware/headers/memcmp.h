@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-inline int memcmp (const void *str1, const void *str2, uint64_t count)
+static inline int memcmp (const void *str1, const void *str2, uint64_t count)
 {
     const unsigned char *s1 = (const unsigned char*)str1;
     const unsigned char *s2 = (const unsigned char*)str2;

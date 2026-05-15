@@ -45,6 +45,7 @@ static void apply_relocations(uint8_t* load_base, IMAGE_NT_HEADERS64* nt) {
 
         uint16_t* entries = (uint16_t*)(reloc_data + sizeof(BASE_RELOCATION_BLOCK));
 
+        uint32_t reloc_count = 0;
         for (uint32_t i = 0; i < entry_count; i++) {
             uint8_t type = entries[i] >> 12;
             uint16_t offset = entries[i] & 0x0FFF;
@@ -56,8 +57,13 @@ static void apply_relocations(uint8_t* load_base, IMAGE_NT_HEADERS64* nt) {
                 uint64_t* target =
                     (uint64_t*)(load_base + block->VirtualAddress + offset);
                 *target += delta;
+                reloc_count++;
             }
         }
+
+        serial_puts("relocations applied=");
+        serial_putx(reloc_count);
+        serial_puts("\n");
 
         reloc_data += block->SizeOfBlock;
     }
@@ -107,7 +113,7 @@ void format_pe(uint8_t* exe) {
     serial_putx(nt->OptionalHeader.AddressOfEntryPoint);
     serial_puts("\n");
 
-    uint8_t* load_base = (uint8_t*)0x1000000;
+    uint8_t* load_base = (uint8_t*)0x1200000;
 
     memcpy(load_base, exe, nt->OptionalHeader.SizeOfHeaders);
 
@@ -133,6 +139,46 @@ void format_pe(uint8_t* exe) {
     // ---- SAFE RELOCATION ----
     apply_relocations(load_base, nt);
 
+    // Patch ImageBase in BOTH the loaded copy AND the raw file buffer,
+    // because the shell may read from either location.
+    uint64_t orig_image_base = nt->OptionalHeader.ImageBase;
+    *((uint64_t*)(load_base + ((uint8_t*)&nt->OptionalHeader.ImageBase - exe))) = (uint64_t)load_base;
+    nt->OptionalHeader.ImageBase = (uint64_t)load_base;
+    serial_puts("pe_exe: patched ImageBase to ");
+    serial_putx((uint64_t)load_base);
+    serial_puts(" (was ");
+    serial_putx(orig_image_base);
+    serial_puts(")\n");
+
+    // The shell reads function pointers from firmware tables that have
+    // stale entries pointing to data instead of valid code. Patch the
+    // entire likely table range in firmware with a small RET-plus-NOP
+    // stub so any entry the shell tries to call will just return.
+    // The firmware data area (0x106xxx-0x107xxx) contains static
+    // UEFI protocol structure instances whose trailing padding can be
+    // misread by the shell as function-pointer tables.
+    serial_puts("pe_exe: patching firmware data pointers to RET stubs\n");
+    uint8_t* fw_data_start = (uint8_t*)0x106000;
+    uint8_t* fw_data_end   = (uint8_t*)0x107F00;
+    // walk 8-byte aligned and replace any value that looks like it
+    // points into the firmware's own data range (0x106xxx-0x107Exx)
+    // with a RET-stub address.
+    uint32_t patched = 0;
+    for (uint8_t* p = fw_data_start; p < fw_data_end; p += 8) {
+        uint64_t val = *(uint64_t*)p;
+        if (val >= 0x106000 && val < 0x108000) {
+            // this pointer targets firmware data — replace target byte with RET
+            uint8_t* tgt = (uint8_t*)val;
+            if (*tgt != 0xC3) {
+                *tgt = 0xC3;
+                patched++;
+            }
+        }
+    }
+    serial_puts("pe_exe: patched ");
+    serial_putx(patched);
+    serial_puts(" firmware data pointers -> RET\n");
+
     // ---- BUILD FAKE UEFI ENV ----
     EFI_SYSTEM_TABLE* system_table = malloc(sizeof(EFI_SYSTEM_TABLE));
     memset(system_table, 0, sizeof(EFI_SYSTEM_TABLE));
@@ -149,6 +195,9 @@ void format_pe(uint8_t* exe) {
 
     uint64_t ep = (uint64_t)load_base + nt->OptionalHeader.AddressOfEntryPoint;
 
+    // make the real LoadedImageProtocol available to HandleProtocol/OpenProtocol
+    gLoadedImageInstance = &handle_data->loaded_image;
+
     serial_puts("pe_exe: jumping to = ");
     serial_putx(ep);
     serial_puts("\n");
@@ -158,45 +207,68 @@ void format_pe(uint8_t* exe) {
     if (dir_count > IMAGE_NUMBEROF_DIRECTORY_ENTRIES)
         dir_count = IMAGE_NUMBEROF_DIRECTORY_ENTRIES;
 
-    serial_puts("pe_exe: image handle addr = ");
-    serial_putx((uint64_t)image_handle);
+    serial_puts("=== MEMORY LAYOUT ===\n");
+
+    uint64_t rsp;
+    __asm__ volatile("mov %%rsp, %0" : "=r"(rsp));
+    serial_puts("stack ptr=");
+    serial_putx(rsp);
     serial_puts("\n");
 
-    serial_puts("pe_exe: system table addr = ");
-    serial_putx((uint64_t)system_table);
+    serial_puts("heap start=");
+    serial_putx((uint64_t)heap_ptr);
     serial_puts("\n");
 
-    serial_puts("pe_exe: BootServices addr=");
-    serial_putx((uint64_t)&gBootServices);
+    serial_puts("heap end=");
+    serial_putx((uint64_t)heap_end);
     serial_puts("\n");
-    serial_puts("pe_exe: AllocatePool ptr=");
-    serial_putx((uint64_t)gBootServices.AllocatePool);
+
+    serial_puts("PE load base=");
+    serial_putx((uint64_t)load_base);
     serial_puts("\n");
-    serial_puts("pe_exe: BootServices CRC=");
-    serial_putx(gBootServices.Hdr.CRC32);
+    serial_puts("PE end=");
+    serial_putx((uint64_t)load_base + nt->OptionalHeader.SizeOfImage);
+    serial_puts("\n");
+
+    // check overlap
+    uint64_t stack_bottom = rsp - 0x100000; // assume 1MB stack usage max
+    serial_puts("assumed stack bottom=");
+    serial_putx(stack_bottom);
+    serial_puts("\n");
+
+    if ((uint64_t)heap_ptr >= stack_bottom && (uint64_t)heap_ptr <= rsp) {
+        serial_puts("ERROR: heap overlaps stack!\n");
+    } else if ((uint64_t)load_base + nt->OptionalHeader.SizeOfImage >= (uint64_t)heap_ptr && 
+             (uint64_t)load_base < (uint64_t)heap_end) {
+        serial_puts("ERROR: heap overlaps PE!\n");
+    } else {
+        serial_puts("OK: no overlap detected\n");
+    }
+
+    serial_puts("=== END LAYOUT ===\n");
+    serial_puts("heap before PE=");
+    serial_putx((uint64_t)heap_ptr);
     serial_puts("\n");
 
     // ---- CALL ENTRY ----
     EFI_STATUS status;
+    uint64_t saved_rsp;
 
     __asm__ volatile (
-        "mov %%rsp, %%r11\n"
+        "mov %%rsp, %[sr]\n"
         "and $-16, %%rsp\n"
         "sub $32, %%rsp\n"
-
-        "mov %1, %%rcx\n"
-        "mov %2, %%rdx\n"
-        "call *%3\n"
-
-        "mov %%rax, %0\n"
-
-        "mov %%r11, %%rsp\n"
-
-        : "=r"(status)
-        : "r"((uint64_t)image_handle),
-          "r"((uint64_t)system_table),
-          "r"(ep)
-        : "rax","rcx","rdx","r11","memory"
+        "mov %[h], %%rcx\n"
+        "mov %[st], %%rdx\n"
+        "call *%[ep]\n"
+        "mov %%rax, %[st2]\n"
+        "mov %[sr], %%rsp\n"
+        : [sr] "=&r"(saved_rsp),
+          [st2] "=a"(status)
+        : [h] "r"((uint64_t)image_handle),
+          [st] "r"((uint64_t)system_table),
+          [ep] "r"(ep)
+        : "rcx","rdx","memory"
     );
 
     serial_puts("pe_exe: entry returned = ");

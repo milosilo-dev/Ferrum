@@ -1,3 +1,4 @@
+use std::io::Write;
 use kvm_ioctls::VcpuExit;
 
 use crate::vm::vm::VirtualMachine;
@@ -14,14 +15,44 @@ pub enum CrashReason {
 }
 
 impl VirtualMachine {
+    pub fn dump_mem(&self, addr: u64, len: usize) {
+        let regions = self.memory_regions.lock().unwrap();
+        for region in regions.iter() {
+            let end = region.mem_offset + region.mem_size as u64;
+            if addr >= region.mem_offset && addr < end {
+                let offset = (addr - region.mem_offset) as usize;
+                let available = (end - addr).min(len as u64) as usize;
+                if let Some(data) = region.read(offset, available) {
+                    print!("dump at {:#x}: ", addr);
+                    for (i, b) in data.iter().enumerate().take(64) {
+                        if i > 0 && i % 16 == 0 { print!("\n{:16}", ""); }
+                        print!("{:02x} ", b);
+                    }
+                    println!();
+                }
+                break;
+            }
+        }
+    }
+
     pub fn run(&mut self) -> Result<(), CrashReason> {
         let exit = self.vcpu.fd.run().expect("run failed");
         match exit {
             VcpuExit::Hlt => {
-                println!("KVM_EXIT_HLT");
+                let regs = self.vcpu.fd.get_regs().ok();
+                if let Some(regs) = regs {
+                    println!("KVM_EXIT_HLT at RIP={:#x}", regs.rip);
+                } else {
+                    println!("KVM_EXIT_HLT");
+                }
+                std::io::stdout().flush().ok();
                 return Err(CrashReason::Hlt);
             }
             VcpuExit::IoOut(port, data) => {
+                if port == 0x500 {
+                    println!("VM HALT via port 0x500");
+                    return Err(CrashReason::Hlt);
+                }
                 let mut io_map = self.io_map.lock().unwrap();
                 io_map.output(port, data);
             }
@@ -78,8 +109,8 @@ impl VirtualMachine {
                 return Err(CrashReason::Shutdown);
             }
             exit_reason => {
+                std::io::stdout().flush().ok();
                 println!("Unhandled exit: {:?}", exit_reason);
-                // return Err(CrashReason::UnhandledExit);
             }
         }
         Ok(())

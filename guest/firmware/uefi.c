@@ -12,8 +12,7 @@
     }
 
 static EFI_STATUS EFIAPI stub_Null() {
-    serial_puts("[STUB] NULL service called — halting\n");
-    for (;;) __asm__("hlt");
+    return EFI_SUCCESS;
 }
 
 // ── con out ───────────────────────────────────────────────────────
@@ -83,21 +82,13 @@ static EFI_STATUS EFIAPI efi_AllocatePool(
     serial_putx(type);
     serial_puts(" size=");
     serial_putx(size);
-    serial_puts(" allocate pool out arg=");
-    serial_putx((uint32_t)*out);
     serial_puts("\n");
 
     void* ptr = malloc(size);
     if (!ptr) return EFI_OUT_OF_RESOURCES;
     memset(ptr, 0, size);
-    uint64_t ra;
-    __asm__("mov 8(%%rbp), %0" : "=r"(ra));
     *out = ptr;
-
-    uint64_t rsp;
-    __asm__ volatile("mov %%rsp, %0" : "=r"(rsp));
-    uint64_t retaddr = *(uint64_t*)rsp;
-
+    
     serial_puts("AllocatePool result=");
     serial_putx((uint64_t)ptr);
     serial_puts("\n");
@@ -117,20 +108,70 @@ static EFI_STATUS EFIAPI efi_AllocatePages(
     serial_putx(memory_type);
     serial_puts(" pages=");
     serial_putx(pages);
-    serial_puts(" requested_addr=");
-    serial_putx(*memory);
+    serial_puts(" requested=");
+    serial_putx((uint64_t)*memory);
     serial_puts("\n");
 
     void* ptr = malloc(pages * 4096);
     if (!ptr) return EFI_OUT_OF_RESOURCES;
     memset(ptr, 0, pages * 4096);
+    *memory = (EFI_PHYSICAL_ADDRESS)ptr;
 
     serial_puts("AllocatePages result=");
-    serial_putx((uint64_t)ptr);
+    serial_putx((uint64_t)*memory);
     serial_puts("\n");
 
-    *memory = (EFI_PHYSICAL_ADDRESS)ptr;
     return EFI_SUCCESS;
+}
+
+// ── real loaded-image protocol (set by format_PE before entry) ──
+static EFI_LOADED_IMAGE_PROTOCOL* gLoadedImageInstance = NULL;
+
+static int efi_guid_match(EFI_GUID* a, EFI_GUID* b) {
+    return memcmp(a, b, sizeof(EFI_GUID)) == 0;
+}
+
+static EFI_GUID gEfiLoadedImageProtocolGuid2 = {
+    0x5B1B31A1, 0x9562, 0x11D2,
+    {0x8E, 0x3F, 0x00, 0xA0, 0xC9, 0x69, 0x72, 0x3B}
+};
+
+// ── simple handle database ─────────────────────────────────────────
+#define MAX_PROTOCOLS 64
+static struct {
+    EFI_HANDLE handle;
+    EFI_GUID   guid;
+    void*      iface;
+} gProtocolDB[MAX_PROTOCOLS];
+static int gProtocolCount;
+
+static EFI_STATUS EFIAPI efi_InstallProtocolInterface(
+    EFI_HANDLE *Handle,
+    EFI_GUID   *Protocol,
+    VOID       *Interface,
+    VOID       *DevicePath
+) {
+    serial_puts("[STUB] InstallProtocolInterface\n");
+    if (Handle && *Handle == NULL)
+        *Handle = (EFI_HANDLE)(uint64_t)4;
+    if (Handle && Protocol && gProtocolCount < MAX_PROTOCOLS) {
+        gProtocolDB[gProtocolCount].handle = *Handle;
+        gProtocolDB[gProtocolCount].guid   = *Protocol;
+        gProtocolDB[gProtocolCount].iface  = Interface;
+        gProtocolCount++;
+    }
+    return EFI_SUCCESS;
+}
+
+// find first matching protocol in database; returns NULL if not found
+static void* efi_find_protocol(EFI_HANDLE handle, EFI_GUID* guid) {
+    if (!guid) return NULL;
+    for (int i = 0; i < gProtocolCount; i++) {
+        if (gProtocolDB[i].handle == handle &&
+            efi_guid_match(&gProtocolDB[i].guid, guid))
+            return gProtocolDB[i].iface;
+    }
+    return NULL;
 }
 
 static EFI_STATUS EFIAPI efi_LocateProtocol(
@@ -140,29 +181,55 @@ static EFI_STATUS EFIAPI efi_LocateProtocol(
     serial_putx(guid->Data1); serial_puts("-");
     serial_putx(guid->Data2); serial_puts("-");
     serial_putx(guid->Data3); serial_puts("}\n");
-    *iface = NULL;
-    return EFI_NOT_FOUND;
+
+    // return the real LoadedImageProtocol if requested
+    if (gLoadedImageInstance && efi_guid_match(guid, &gEfiLoadedImageProtocolGuid2)) {
+        *iface = gLoadedImageInstance;
+        serial_puts("  -> real LoadedImageProtocol\n");
+        return EFI_SUCCESS;
+    }
+
+    // check protocol database for ANY handle
+    if (gProtocolCount > 0) {
+        for (int i = 0; i < gProtocolCount; i++) {
+            if (efi_guid_match(&gProtocolDB[i].guid, guid)) {
+                *iface = gProtocolDB[i].iface;
+                return EFI_SUCCESS;
+            }
+        }
+    }
+
+    // allocate a minimal protocol interface: 16 stub function pointers
+    uint64_t* proto = malloc(16 * sizeof(uint64_t));
+    if (!proto) {
+        *iface = NULL;
+        return EFI_OUT_OF_RESOURCES;
+    }
+    for (int i = 0; i < 16; i++)
+        proto[i] = (uint64_t)stub_Null;
+
+    *iface = proto;
+    return EFI_SUCCESS;
 }
 
-// ── boot service stubs ────────────────────────────────────────────
-
+static EFI_STATUS EFIAPI stub_FreePool(void* a, void* b, void* c, void* d) {
+    if (!a) return EFI_INVALID_PARAMETER;
+    free(a);
+    return EFI_SUCCESS;
+}
 STUB(RaiseTPL,                      EFI_SUCCESS)
 STUB(RestoreTPL,                    EFI_SUCCESS)
 STUB(FreePages,                     EFI_SUCCESS)
 STUB(GetMemoryMap,                  EFI_BUFFER_TOO_SMALL)
-STUB(FreePool,                      EFI_SUCCESS)
 STUB(CreateEvent,                   EFI_SUCCESS)
 STUB(SetTimer,                      EFI_SUCCESS)
 STUB(WaitForEvent,                  EFI_SUCCESS)
 STUB(SignalEvent,                   EFI_SUCCESS)
 STUB(CloseEvent,                    EFI_SUCCESS)
 STUB(CheckEvent,                    EFI_NOT_READY)
-STUB(InstallProtocolInterface,      EFI_SUCCESS)
 STUB(ReinstallProtocolInterface,    EFI_SUCCESS)
 STUB(UninstallProtocolInterface,    EFI_SUCCESS)
-STUB(HandleProtocol,                EFI_NOT_FOUND)
 STUB(RegisterProtocolNotify,        EFI_SUCCESS)
-STUB(LocateHandle,                  EFI_NOT_FOUND)
 STUB(LocateDevicePath,              EFI_NOT_FOUND)
 STUB(InstallConfigurationTable,     EFI_SUCCESS)
 STUB(LoadImage,                     EFI_UNSUPPORTED)
@@ -173,21 +240,94 @@ STUB(GetNextMonotonicCount,         EFI_SUCCESS)
 STUB(SetWatchdogTimer,              EFI_SUCCESS)
 STUB(ConnectController,             EFI_NOT_FOUND)
 STUB(DisconnectController,          EFI_SUCCESS)
-STUB(OpenProtocol,                  EFI_NOT_FOUND)
 STUB(CloseProtocol,                 EFI_SUCCESS)
 STUB(OpenProtocolInformation,       EFI_SUCCESS)
 STUB(ProtocolsPerHandle,            EFI_SUCCESS)
-STUB(LocateHandleBuffer,            EFI_NOT_FOUND)
 STUB(InstallMultipleProtocolInterfaces,   EFI_SUCCESS)
 STUB(UninstallMultipleProtocolInterfaces, EFI_SUCCESS)
-STUB(CalculateCrc32,                EFI_SUCCESS)
 
-static VOID EFIAPI stub_CopyMem(VOID *dst, VOID *src, UINTN len) { memcpy(dst, src, len); }
-static VOID EFIAPI stub_SetMem(VOID *buf, UINTN size, UINT8 val) { memset(buf, val, size); }
+static EFI_STATUS EFIAPI efi_CalculateCrc32(VOID *Data, UINTN DataSize, UINT32 *CrcOut) {
+    if (CrcOut) *CrcOut = crc32((uint8_t*)Data, DataSize);
+    return EFI_SUCCESS;
+}
 
-static EFI_STATUS EFIAPI stub_Exit(EFI_HANDLE img, EFI_STATUS status, UINTN size, CHAR16 *data) {
-    serial_puts("[STUB] Exit — halting\n");
-    for (;;) __asm__("hlt");
+// ── fake handle for protocol queries ───────────────────────────────
+
+static int gFakeHandleData;
+static EFI_HANDLE gFakeHandle = (EFI_HANDLE)&gFakeHandleData;
+
+static EFI_STATUS EFIAPI efi_HandleProtocol(
+    EFI_HANDLE handle,
+    EFI_GUID*  protocol,
+    VOID**     interface
+) {
+    serial_puts("[STUB] HandleProtocol\n");
+    if (handle != NULL) {
+        // check protocol database first
+        void* found = efi_find_protocol(handle, protocol);
+        if (found) {
+            *interface = found;
+            return EFI_SUCCESS;
+        }
+        // special: LoadedImageProtocol
+        if (gLoadedImageInstance && efi_guid_match(protocol, &gEfiLoadedImageProtocolGuid2)) {
+            *interface = gLoadedImageInstance;
+            serial_puts("  -> real LoadedImageProtocol\n");
+            return EFI_SUCCESS;
+        }
+        uint64_t* proto = malloc(16 * sizeof(uint64_t));
+        if (!proto) {
+            *interface = NULL;
+            return EFI_OUT_OF_RESOURCES;
+        }
+        for (int i = 0; i < 16; i++)
+            proto[i] = (uint64_t)stub_Null;
+        *interface = proto;
+        return EFI_SUCCESS;
+    }
+    *interface = NULL;
+    return EFI_NOT_FOUND;
+}
+
+static EFI_STATUS EFIAPI efi_OpenProtocol(
+    EFI_HANDLE handle,
+    EFI_GUID*  protocol,
+    VOID**     interface,
+    EFI_HANDLE agent,
+    EFI_HANDLE controller,
+    UINT32     attributes
+) {
+    serial_puts("[STUB] OpenProtocol handle=");
+    serial_putx((uint64_t)handle);
+    serial_puts(" guid=");
+    serial_putx(protocol->Data1); serial_putc('-');
+    serial_putx(protocol->Data2); serial_putc('-');
+    serial_putx(protocol->Data3);
+    serial_puts("\n");
+    if (handle != NULL) {
+        // check protocol database first
+        void* found = efi_find_protocol(handle, protocol);
+        if (found) {
+            *interface = found;
+            return EFI_SUCCESS;
+        }
+        if (gLoadedImageInstance && efi_guid_match(protocol, &gEfiLoadedImageProtocolGuid2)) {
+            *interface = gLoadedImageInstance;
+            serial_puts("  -> real LoadedImageProtocol\n");
+            return EFI_SUCCESS;
+        }
+        uint64_t* proto = malloc(16 * sizeof(uint64_t));
+        if (!proto) {
+            *interface = NULL;
+            return EFI_OUT_OF_RESOURCES;
+        }
+        for (int i = 0; i < 16; i++)
+            proto[i] = (uint64_t)stub_Null;
+        *interface = proto;
+        return EFI_SUCCESS;
+    }
+    *interface = NULL;
+    return EFI_NOT_FOUND;
 }
 
 static EFI_STATUS EFIAPI efi_LocateHandleBuffer(
@@ -198,9 +338,33 @@ static EFI_STATUS EFIAPI efi_LocateHandleBuffer(
     EFI_HANDLE **buf
 ) {
     serial_puts("[STUB] LocateHandleBuffer\n");
-    if (count) *count = 0;
-    if (buf)   *buf   = NULL;
-    return EFI_NOT_FOUND;
+    if (!count || !buf) return EFI_INVALID_PARAMETER;
+    *count = 1;
+    *buf = malloc(sizeof(EFI_HANDLE));
+    if (!*buf) return EFI_OUT_OF_RESOURCES;
+    (*buf)[0] = gFakeHandle;
+    return EFI_SUCCESS;
+}
+
+static EFI_STATUS EFIAPI efi_LocateHandle(
+    EFI_LOCATE_SEARCH_TYPE type,
+    EFI_GUID *guid,
+    VOID *key,
+    UINTN *count,
+    EFI_HANDLE *buf
+) {
+    serial_puts("[STUB] LocateHandle\n");
+    if (count) *count = 1;
+    if (buf)  buf[0] = gFakeHandle;
+    return EFI_SUCCESS;
+}
+
+static VOID EFIAPI stub_CopyMem(VOID *dst, VOID *src, UINTN len) { memcpy(dst, src, len); }
+static VOID EFIAPI stub_SetMem(VOID *buf, UINTN size, UINT8 val) { memset(buf, val, size); }
+
+static EFI_STATUS EFIAPI stub_Exit(EFI_HANDLE img, EFI_STATUS status, UINTN size, CHAR16 *data) {
+    serial_puts("[STUB] Exit — halting\n");
+    for (;;) __asm__("hlt");
 }
 
 // ── boot services table ───────────────────────────────────────────
@@ -226,13 +390,13 @@ static EFI_BOOT_SERVICES gBootServices = {
     .SignalEvent                        = (void*)stub_SignalEvent,
     .CloseEvent                         = (void*)stub_CloseEvent,
     .CheckEvent                         = (void*)stub_CheckEvent,
-    .InstallProtocolInterface           = (void*)stub_InstallProtocolInterface,
+    .InstallProtocolInterface           = (void*)efi_InstallProtocolInterface,
     .ReinstallProtocolInterface         = (void*)stub_ReinstallProtocolInterface,
     .UninstallProtocolInterface         = (void*)stub_UninstallProtocolInterface,
-    .HandleProtocol                     = (void*)stub_HandleProtocol,
+    .HandleProtocol                     = (void*)efi_HandleProtocol,
     .Reserved                           = NULL,
     .RegisterProtocolNotify             = (void*)stub_RegisterProtocolNotify,
-    .LocateHandle                       = (void*)stub_LocateHandle,
+    .LocateHandle                       = (void*)efi_LocateHandle,
     .LocateDevicePath                   = (void*)stub_LocateDevicePath,
     .InstallConfigurationTable          = (void*)stub_InstallConfigurationTable,
     .LoadImage                          = (void*)stub_LoadImage,
@@ -245,7 +409,7 @@ static EFI_BOOT_SERVICES gBootServices = {
     .SetWatchdogTimer                   = (void*)stub_SetWatchdogTimer,
     .ConnectController                  = (void*)stub_ConnectController,
     .DisconnectController               = (void*)stub_DisconnectController,
-    .OpenProtocol                       = (void*)stub_OpenProtocol,
+    .OpenProtocol                       = (void*)efi_OpenProtocol,
     .CloseProtocol                      = (void*)stub_CloseProtocol,
     .OpenProtocolInformation            = (void*)stub_OpenProtocolInformation,
     .ProtocolsPerHandle                 = (void*)stub_ProtocolsPerHandle,
@@ -253,7 +417,7 @@ static EFI_BOOT_SERVICES gBootServices = {
     .LocateProtocol                     = (void*)efi_LocateProtocol,
     .InstallMultipleProtocolInterfaces  = (void*)stub_InstallMultipleProtocolInterfaces,
     .UninstallMultipleProtocolInterfaces= (void*)stub_UninstallMultipleProtocolInterfaces,
-    .CalculateCrc32                     = (void*)stub_CalculateCrc32,
+    .CalculateCrc32                     = (void*)efi_CalculateCrc32,
     .CopyMem                            = stub_CopyMem,
     .SetMem                             = stub_SetMem,
     .CreateEventEx                      = (void*)stub_CreateEvent, // reuse

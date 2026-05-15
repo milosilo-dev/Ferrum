@@ -55,4 +55,15 @@ fn main() {
             break;
         }
     }
+
+    vm.dump_mem(0x0, 64);        // what's at address 0? (call [rax] target when rax=0)
+    vm.dump_mem(0x7080, 32);
+    vm.dump_mem(0x1221820, 64);
+    vm.dump_mem(0x1214CA0, 64);  // return address area from stack dump
+    vm.dump_mem(0x3000000, 256); // system table + handle data + AllocatePool buffer
+
+    // shell call table: instruction at 0x1214CA3 loads RAX from [rip+0xFA43E] = [0x130F0E8]
+    vm.dump_mem(0x130F0E0, 32);
+    vm.dump_mem(0x121DA40, 40);  // new return address
+    vm.dump_mem(0x30000D8, 128*6); // stub protocol allocations
 }

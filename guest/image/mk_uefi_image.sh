@@ -18,6 +18,8 @@ parted $IMG --script set 1 esp on
 
 # 3. Attach loop device
 LOOP=$(losetup --find --partscan --show $IMG)
+partprobe "$LOOP" || true
+udevadm settle || true
 
 # 4. Format partition as FAT32
 mkfs.fat -F32 ${LOOP}p1

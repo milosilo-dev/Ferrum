@@ -13,22 +13,30 @@
 #include "headers/halt.h"
 
 void c_main_64(void) {
+    uint64_t rsp;
+    __asm__ volatile("mov %%rsp, %0" : "=r"(rsp));
+    serial_puts("c_main_64 rsp=");
+    serial_putx(rsp);
+    serial_puts("\n");
     serial_puts("=-- Long mode --=\n");
 
     tss_init();
-    gdt_set_tss(gdt64, 3);
+    gdt_set_tss(gdt64, 5);
     GDTPointer64 gdtp = {
         .size = sizeof(gdt64) - 1,
         .base = (uint64_t)gdt64
     };
     __asm__ volatile("lgdt %0" :: "m"(gdtp));
-    tss_enable(3 * 8);
+    tss_enable(5 * 8);
     
     idt_init();
 
     idt_init();
     init_memmap();
-    init_heap(0x00400000, 0x00800000);
+    init_heap(0x3000000, 0x4000000);
+    serial_puts("heap after init=");
+    serial_putx((uint64_t)heap_ptr);
+    serial_puts("\n");
     virtio_blk_init();
 
     SectorRange sec_range;
@@ -84,7 +92,7 @@ void c_main_64(void) {
         return;
     }
 
-    uint8_t* file_buf = malloc(entry->file_size);
+    uint8_t* file_buf = (uint8_t*)0x1000000;
 
     read_file(&fs, entry, file_buf, entry->file_size);
     for (int i = 0; i < 10; i++) {

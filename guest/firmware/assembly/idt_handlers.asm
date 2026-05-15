@@ -49,9 +49,33 @@ ISR_NOERR i
 %endrep
 
 isr_common:
-    ; stack now: error_code, exception_num, rip, cs, rflags, rsp, ss
-    ; call a C handler
-    mov rdi, [rsp]      ; exception number (first arg)
-    mov rsi, [rsp + 8]    ; error code (second arg)
+    ; Save all GP registers immediately
+    push rbp
+    push rax
+    push rbx
+    push rcx
+    push rdx
+    push rsi
+    push rdi
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
+
+    ; stack layout now (from top):
+    ;   r15..rbp (15 saved GP regs)
+    ;   exception_num
+    ;   error_code
+    ;   rip, cs, rflags, [rsp, ss (ring change only)]
+
+    mov rdi, rsp        ; pointer to ExceptionContext struct
     call exception_handler
-    hlt
+    ; fallback: write to halt port (never reached since exception_handler loops)
+    mov dx, 0x500
+    xor al, al
+    out dx, al
+    jmp $-3

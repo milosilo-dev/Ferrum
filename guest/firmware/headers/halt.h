@@ -1,8 +1,10 @@
 #pragma once
 
+#include "serial.h"
+
 __attribute__((noreturn))
 static void hang(void) {
     for (;;) {
-        __asm__ volatile("cli; hlt");
+        outb(0x500, 0);
     }
 }

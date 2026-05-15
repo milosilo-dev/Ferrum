@@ -54,11 +54,71 @@ static inline void idt_init(void) {
     __asm__ volatile("lidt %0" :: "m"(idtp));
 }
 
-void exception_handler(uint64_t exc_num, uint64_t err_code) {
+typedef struct {
+    uint64_t r15, r14, r13, r12, r11, r10;
+    uint64_t r9, r8, rdi, rsi, rdx, rcx, rbx, rax, rbp;
+    uint64_t exception_num, error_code, rip, cs, rflags;
+} ExceptionContext;
+
+void exception_handler(ExceptionContext* ctx) {
     serial_puts("EXCEPTION: ");
-    serial_putx(exc_num);
+    serial_putx(ctx->exception_num);
     serial_puts(" ERR: ");
-    serial_putx(err_code);
+    serial_putx(ctx->error_code);
+    serial_puts(" RIP: ");
+    serial_putx(ctx->rip);
+    serial_puts("\n  CODE: ");
+    for (int i = 0; i < 16; i++) {
+        serial_putx(((uint8_t*)ctx->rip)[i]);
+        serial_putc(' ');
+    }
+    uint64_t old_rsp = (uint64_t)(&ctx->rflags) + 8;
+    serial_puts("\n  OLD_RSP: ");
+    serial_putx(old_rsp);
+    serial_puts("\n  OLD_STACK: ");
+    for (int i = 0; i < 20; i++) {
+        serial_putx(((uint64_t*)old_rsp)[i]);
+        serial_putc(' ');
+    }
+    serial_puts("\n  PRE_CODE @ rip-32: ");
+    for (int i = 0; i < 32; i++) {
+        serial_putx(((uint8_t*)(ctx->rip - 32))[i]);
+        serial_putc(' ');
+    }
+    serial_puts("\n  REGS: ");
+    serial_puts("\n  rax="); serial_putx(ctx->rax);
+    serial_puts(" rbx="); serial_putx(ctx->rbx);
+    serial_puts(" rcx="); serial_putx(ctx->rcx);
+    serial_puts(" rdx="); serial_putx(ctx->rdx);
+    serial_puts(" rsi="); serial_putx(ctx->rsi);
+    serial_puts(" rdi="); serial_putx(ctx->rdi);
+    serial_puts("\n  r8="); serial_putx(ctx->r8);
+    serial_puts(" r9="); serial_putx(ctx->r9);
+    serial_puts(" r10="); serial_putx(ctx->r10);
+    serial_puts(" r11="); serial_putx(ctx->r11);
+    serial_puts("\n  r12="); serial_putx(ctx->r12);
+    serial_puts(" r13="); serial_putx(ctx->r13);
+    serial_puts(" r14="); serial_putx(ctx->r14);
+    serial_puts(" r15="); serial_putx(ctx->r15);
+    serial_puts("\n  rbp="); serial_putx(ctx->rbp);
+    serial_puts("\n  rflags="); serial_putx(ctx->rflags);
+    serial_puts("\n  cs="); serial_putx(ctx->cs);
+    serial_puts("\n  CODE_RA:");
+    for (int s = 0; s < 20; s++) {
+        uint64_t addr = ((uint64_t*)old_rsp)[s];
+        if (addr >= 0x1200000 && addr <= 0x1310000) {
+            serial_puts("\n    stk["); serial_putx((uint64_t)s); serial_puts("]@");
+            serial_putx(addr); serial_puts("-8: ");
+            for (int i = -8; i < 20; i++) {
+                serial_putx(((uint8_t*)addr)[i]); serial_putc(' ');
+            }
+        }
+    }
+    serial_puts("\n  ALLOCPOOL_BUF @0x30605D8: ");
+    for (int i = 0; i < 27; i++) {
+        serial_putx(((uint64_t*)0x30605D8)[i]);
+        serial_putc(' ');
+    }
     serial_puts("\n");
-    for(;;) __asm__("hlt");
+    for(;;) outb(0x500, 0);
 }
