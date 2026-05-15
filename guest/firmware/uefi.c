@@ -22,7 +22,6 @@ static EFI_STATUS EFIAPI efi_output_string(
     EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *This,
     uint16_t *String
 ) {
-    serial_puts("[STUB] STOP");
     while (*String) {
         char c = (char)(*String & 0xFF);
         if (c == '\n') serial_putc('\r');

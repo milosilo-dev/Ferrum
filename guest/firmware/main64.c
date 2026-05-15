@@ -10,6 +10,7 @@
 #include "mem/memmap.c"
 #include "tss.c"
 #include "headers/gdt.h"
+#include "headers/halt.h"
 
 void c_main_64(void) {
     serial_puts("=-- Long mode --=\n");
@@ -96,7 +97,5 @@ void c_main_64(void) {
     format_pe(file_buf);
 
     // spin forever
-    while (1) {
-        __asm__ volatile("hlt");
-    }
+    hang();
 }
