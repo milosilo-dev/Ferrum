@@ -258,6 +258,15 @@ static void run_tests(void)
     print(L"[INFO] GetMemoryMap status: ");
     print_hex(s);
 
+    print(L"[INFO] GetMemoryMap desc: ");
+    print_hex(desc);
+
+    print(L"[INFO] GetMemoryMap key: ");
+    print_hex(key);
+
+    print(L"[INFO] GetMemoryMap size: ");
+    print_hex(size);
+
     if (s == EFI_BUFFER_TOO_SMALL) {
         print(L"[OK] GetMemoryMap probe (EFI_BUFFER_TOO_SMALL as expected)\r\n");
     }

@@ -22,7 +22,6 @@ static EFI_STATUS EFIAPI efi_output_string(
     EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *This,
     uint16_t *String
 ) {
-    serial_puts("[EFI] Output String \n");
     while (*String) {
         char c = (char)(*String & 0xFF);
         if (c == '\n') serial_putc('\r');
@@ -224,14 +223,15 @@ static EFI_STATUS EFIAPI stub_FreePool(void* a, void* b, void* c, void* d) {
 
 static EFI_STATUS EFIAPI efi_GetMemoryMap(uint64_t *MemoryMapSize, 
     EFI_MEMORY_DESCRIPTOR *MemoryMap,
-    UINTN *MapKey, 
-    UINTN *DescriptorSize, 
+    uint64_t *MapKey, 
+    uint64_t *DescriptorSize, 
     UINT32 *DescriptorVersion) 
 {
     serial_puts("[EFI] MemoryMap path=");
     uint64_t required_size = memmap_length * sizeof(EFI_MEMORY_DESCRIPTOR);
     if (MemoryMap == NULL || *MemoryMapSize < required_size){
         *MemoryMapSize = required_size;
+        *DescriptorSize = sizeof(EFI_MEMORY_DESCRIPTOR);
         serial_puts("(BUFFER TOO SMALL) descriptor_size=0x");
         serial_putx(sizeof(EFI_MEMORY_DESCRIPTOR));
         serial_puts(" requiered_size=0x");
