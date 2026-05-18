@@ -46,15 +46,18 @@ void init_memmap() {
     }
 }
 
-typedef struct {
-    uint32_t              Type;           // EFI memory type from above
-    uint32_t              Pad;            // padding to align PhysicalStart
-    EFI_PHYSICAL_ADDRESS  PhysicalStart;  // start of region (page aligned)
-    EFI_VIRTUAL_ADDRESS   VirtualStart;   // virtual address (set by OS later)
-    uint64_t              NumberOfPages;  // size in 4KB pages
-    uint64_t              Attribute;      // EFI_MEMORY_WB etc
-} EFI_MEMORY_DESCRIPTOR;
-
-void memmap_to_uefi(void* buf, uint32_t length) {
+uint32_t memmap_to_uefi(EFI_MEMORY_DESCRIPTOR* buf, uint32_t length) {
     uint32_t max_entries = length / sizeof(EFI_MEMORY_DESCRIPTOR);
+    if (memmap_length < max_entries) {
+        max_entries = memmap_length;
+    }
+
+    for (int i = 0; i < max_entries; i ++) {
+        MemMapEntry* entry = (MemMapEntry*)((uint64_t)memmap + i);
+        buf[i]->type = entry->type;
+        buf[i]->PhysicalStart = entry->start;
+        buf[i]->VirtualStart = entry->start;
+        buf[i]->NumberofPages = (entry->start - entry->end) / 4096;
+    }
+    return max_entries;
 }

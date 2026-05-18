@@ -222,7 +222,7 @@ static EFI_STATUS EFIAPI stub_FreePool(void* a, void* b, void* c, void* d) {
     return EFI_SUCCESS;
 }
 
-static EFI_STATUS EFIAPI efi_GetMemoryMap() {
+static EFI_STATUS EFIAPI efi_GetMemoryMap(uint64_t *MemoryMapSize, EFI_MEMORY_DESCRIPTOR *MemoryMap) {
     serial_puts("[EFI] MemoryMap\n");
     return EFI_BUFFER_TOO_SMALL;
 }
